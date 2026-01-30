@@ -29,7 +29,7 @@
         .lang-switch {
             position: absolute; top: 20px; right: 20px;
             background: #26262c; border: 1px solid #3a3a40; color: #aaa;
-            padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: 0.8rem;
+            padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; width: auto;
         }
 
         h1 { font-weight: 800; margin-bottom: 20px; color: #bf94ff; font-size: 1.5rem; margin-top: 10px; }
@@ -144,7 +144,7 @@
             <label data-lang="lbl_quality">Qualité :</label>
             <select id="qualitySelect" onchange="changeQuality()"></select>
             <button class="btn-secondary" onclick="togglePiP()" style="background-color: #e6e619; color: black;" data-lang="btn_pip">📺 Activer PiP</button>
-            <button class="btn-secondary" onclick="downloadM3U8()" data-lang="btn_dl">📥 Télécharger la vidéo</button>
+            <button class="btn-secondary" onclick="downloadM3U8()" data-lang="btn_dl">📥 Télécharger (Fichier)</button>
         </div>
 
         <div id="vlc-section" class="vlc-section">
@@ -180,7 +180,7 @@
                 lbl_link: "Lien externe :",
                 btn_copy: "Copier",
                 err_missing: "Nom manquant.",
-                loading: "Recherche...",
+                loading: "Recherche de",
                 live_on: "🔴 EN DIRECT !",
                 btn_watch_live: "▶️ Regarder le Live",
                 live_msg_vod: "En live (mais pas de VODs).",
@@ -191,7 +191,8 @@
                 loading_vod: "Chargement VOD...",
                 vod_ready: "VOD Prête !",
                 err_conn: "Erreur connexion.",
-                copied: "Lien copié !"
+                copied: "Lien copié !",
+                live_plays: "Joue à : "
             },
             en: {
                 title: "Watch Twitch No Sub",
@@ -210,7 +211,7 @@
                 lbl_link: "External Link:",
                 btn_copy: "Copy",
                 err_missing: "Name missing.",
-                loading: "Searching...",
+                loading: "Searching for",
                 live_on: "🔴 LIVE NOW!",
                 btn_watch_live: "▶️ Watch Live",
                 live_msg_vod: "Live is on (but no VODs).",
@@ -221,7 +222,8 @@
                 loading_vod: "Loading VOD...",
                 vod_ready: "VOD Ready!",
                 err_conn: "Connection error.",
-                copied: "Link copied!"
+                copied: "Link copied!",
+                live_plays: "Playing: "
             },
             es: {
                 title: "Ver Twitch sin Sub",
@@ -240,7 +242,7 @@
                 lbl_link: "Enlace externo:",
                 btn_copy: "Copiar",
                 err_missing: "Falta el nombre.",
-                loading: "Buscando...",
+                loading: "Buscando a",
                 live_on: "🔴 EN VIVO!",
                 btn_watch_live: "▶️ Ver Directo",
                 live_msg_vod: "En vivo (sin VODs).",
@@ -251,7 +253,8 @@
                 loading_vod: "Cargando VOD...",
                 vod_ready: "VOD Listo!",
                 err_conn: "Error de conexión.",
-                copied: "Enlace copiado!"
+                copied: "Enlace copiado!",
+                live_plays: "Jugando a: "
             }
         };
 
@@ -363,7 +366,7 @@
                 const dataLive = await resLive.json();
 
                 if (!dataLive.error) {
-                    const gameInfo = dataLive.game ? `[${dataLive.game}]` : "";
+                    const gameInfo = dataLive.game ? `[${txt('live_plays')} ${dataLive.game}]` : "";
                     elements.liveArea.innerHTML = `
                         <div style="background: rgba(233, 25, 22, 0.15); border: 2px solid #e91916; padding: 15px; border-radius: 12px; margin-bottom: 25px; animation: fadeIn 0.5s;">
                             <h3 style="color: #ff4f4d; margin-bottom: 8px;">${txt('live_on')}</h3>
