@@ -198,8 +198,16 @@
         const vodList = document.getElementById('vod-list');
 
         document.addEventListener('DOMContentLoaded', () => {
-        // Code existant pour Plyr...
-        player = new Plyr(video, { /* ... */ });
+    
+        player = new Plyr(video, {
+
+        controls: [
+        'play-large', 'play', 'progress', 'current-time', 
+        'mute', 'volume', 'settings', 
+        'pip', 'airplay', 'fullscreen'
+        ],
+        settings: ['speed']
+        });
     
         // --- AJOUT : DÉTECTION AUTOMATIQUE DE L'ID DANS L'URL ---
         const urlParams = new URLSearchParams(window.location.search);
@@ -421,5 +429,6 @@
     </script>
 </body>
 </html>
+
 
 
