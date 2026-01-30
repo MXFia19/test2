@@ -130,6 +130,35 @@ async function storyboardHack(seekPreviewsURL) {
 // Servir les fichiers statiques (CSS/JS/HTML)
 app.use(express.static(path.join(__dirname, 'public')));
 
+// --- PROXY CORS (Pour contourner le blocage Twitch) ---
+app.get('/api/proxy', async (req, res) => {
+    const targetUrl = req.query.url;
+    if (!targetUrl) return res.status(400).send('URL manquante');
+
+    try {
+        const response = await axios({
+            url: targetUrl,
+            method: 'GET',
+            responseType: 'stream', // Important pour les fichiers vidéo/texte
+            headers: {
+                // On se fait passer pour le site officiel Twitch
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Referer': 'https://www.twitch.tv/',
+                'Origin': 'https://www.twitch.tv'
+            }
+        });
+
+        // On autorise tout le monde (CORS)
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Content-Type', response.headers['content-type']);
+
+        // On envoie les données reçues vers le navigateur
+        response.data.pipe(res);
+    } catch (e) {
+        console.error("Erreur Proxy:", e.message);
+        res.status(500).send('Erreur lors du proxy');
+    }
+});
 // --- ROUTES ---
 app.get('/api/get-channel-videos', async (req, res) => {
     const channelName = req.query.name;
@@ -180,3 +209,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Serveur prêt sur le port ${PORT}`);
 });
+
