@@ -231,6 +231,27 @@ async function getLiveAccessToken(login) {
         return null; 
     }
 }
+
+// --- FONCTION MANQUANTE : RÉCUPÉRER TITRE & JEU ---
+async function getStreamMetadata(login) {
+    const data = {
+        query: `query {
+            user(login: "${login}") {
+                broadcastSettings {
+                    title
+                    game { displayName }
+                }
+            }
+        }`
+    };
+    try {
+        const response = await axios.post('https://gql.twitch.tv/gql', data, {
+            headers: { 'Client-ID': CLIENT_ID }
+        });
+        return response.data.data?.user?.broadcastSettings;
+    } catch (e) { return null; }
+}
+
 // --- ROUTE API POUR LE LIVE (Strict Mode : Offline = Erreur) ---
 app.get('/api/get-live', async (req, res) => {
     const channelName = req.query.name;
@@ -360,6 +381,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Serveur prêt sur le port ${PORT}`);
 });
+
 
 
 
