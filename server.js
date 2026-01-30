@@ -193,24 +193,35 @@ app.get('/api/proxy', async (req, res) => {
     }
 });
 
-// --- AJOUT : FONCTION POUR LE LIVE ---
-
+// --- FONCTION CORRIGÉE (Minuscules + DeviceID) ---
 async function getLiveAccessToken(login) {
+    // 1. Force le pseudo en minuscules (INDISPENSABLE)
+    const cleanLogin = login.toLowerCase();
+
     const data = {
         operationName: "PlaybackAccessToken_Template",
         query: "query PlaybackAccessToken_Template($login: String!, $isLive: Boolean!, $vodID: ID!, $isVod: Boolean!, $playerType: String!) { streamPlaybackAccessToken(channelName: $login, params: {platform: \"web\", playerBackend: \"mediaplayer\", playerType: $playerType}) @include(if: $isLive) { value signature __typename } }",
-        variables: { isLive: true, login: login, isVod: false, vodID: "", playerType: "site" }
+        variables: { isLive: true, login: cleanLogin, isVod: false, vodID: "", playerType: "site" }
     };
+
     try {
         const response = await axios.post('https://gql.twitch.tv/gql', data, { 
             headers: { 
                 'Client-ID': CLIENT_ID,
-                // Ces 3 lignes sont INDISPENSABLES pour le Live :
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
                 'Referer': 'https://www.twitch.tv/',
-                'Origin': 'https://www.twitch.tv'
+                'Origin': 'https://www.twitch.tv',
+                // Ajout d'un Device-ID aléatoire pour éviter le blocage
+                'Device-ID': 'MkMq8a9' + Math.random().toString(36).substring(2, 15)
             } 
         });
+
+        // Si Twitch renvoie une erreur explicite
+        if (response.data.errors) {
+            console.log(`[Erreur GQL] ${JSON.stringify(response.data.errors)}`);
+            return null;
+        }
+
         return response.data.data.streamPlaybackAccessToken;
     } catch (e) { 
         console.log("Erreur Token Live:", e.message);
@@ -222,17 +233,20 @@ app.get('/api/get-live', async (req, res) => {
     const channelName = req.query.name;
     if (!channelName) return res.status(400).json({ error: 'Nom de chaîne manquant' });
     
-    console.log(`\n🔴 Recherche LIVE : ${channelName}`);
+    // On nettoie le nom (minuscules + sans espaces)
+    const cleanName = channelName.trim().toLowerCase();
+    
+    console.log(`\n🔴 Recherche LIVE : ${cleanName}`);
 
-    const tokenData = await getLiveAccessToken(channelName);
+    const tokenData = await getLiveAccessToken(cleanName);
+    
+    // Si tokenData est null, c'est que le live est OFF ou introuvable
     if (!tokenData) {
-        return res.status(404).json({ error: "Live introuvable ou chaîne hors ligne." });
+        return res.status(404).json({ error: "Live introuvable (Offline ou Pseudo invalide)." });
     }
 
-    // Construction du lien m3u8 officiel pour le live
-    const url = `https://usher.ttvnw.net/api/channel/hls/${channelName}.m3u8?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&playlist_include_framerate=true&segment_preference=4&sig=${tokenData.signature}&token=${tokenData.value}`;
+    const url = `https://usher.ttvnw.net/api/channel/hls/${cleanName}.m3u8?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&playlist_include_framerate=true&segment_preference=4&sig=${tokenData.signature}&token=${tokenData.value}`;
 
-    // On renvoie le lien. Le frontend devra le passer dans le PROXY.
     return res.json({ 
         links: { "Auto (Live)": url }, 
         best: url 
@@ -289,6 +303,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Serveur prêt sur le port ${PORT}`);
 });
+
 
 
 
