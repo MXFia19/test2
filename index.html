@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Watch Twitch VODs Without Subscription</title>
+    <title>Twitch VOD Unblocker</title>
     
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
@@ -13,8 +13,6 @@
    <style>
         :root { --primary: #9146ff; --dark: #0e0e10; --card: #18181b; --text: #efeff1; --danger: #ff4f4d; --outplayer: #007aff; --vlc: #ff8800; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        
-        /* On force la police partout, même sur les boutons et inputs */
         body, button, input, select { font-family: 'Inter', sans-serif; }
         
         body { 
@@ -24,19 +22,24 @@
 
         .container { 
             width: 100%; max-width: 900px; background: var(--card); padding: 25px; 
-            border-radius: 16px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); text-align: center; 
+            border-radius: 16px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); text-align: center; position: relative;
         }
 
-        h1 { font-weight: 800; margin-bottom: 20px; color: #bf94ff; font-size: 1.5rem; }
+        /* LANGUE SELECTOR */
+        .lang-switch {
+            position: absolute; top: 20px; right: 20px;
+            background: #26262c; border: 1px solid #3a3a40; color: #aaa;
+            padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: 0.8rem;
+        }
 
-        /* ALERTE MOBILE */
+        h1 { font-weight: 800; margin-bottom: 20px; color: #bf94ff; font-size: 1.5rem; margin-top: 10px; }
+
         #mobile-alert { 
             display: none; background: rgba(145, 70, 255, 0.15); border: 1px solid var(--primary); 
             color: #e0ccff; padding: 15px; border-radius: 12px; margin-bottom: 20px; text-align: left; 
         }
         .mobile-only { display: none; }
 
-        /* TABS */
         .tabs { display: flex; gap: 10px; margin-bottom: 20px; background: #26262c; padding: 5px; border-radius: 12px; }
         .tab-btn { 
             flex: 1; background: transparent; border: none; color: #aaa; padding: 10px; 
@@ -46,7 +49,6 @@
         .tab-content { display: none; animation: fadeIn 0.3s; }
         .tab-content.active { display: block; }
 
-        /* INPUTS & BOUTONS */
         .search-bar { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap;}
         input[type="text"] { 
             background: #26262c; border: 2px solid #3a3a40; color: white; padding: 12px; 
@@ -62,7 +64,6 @@
         .btn-primary:active { transform: scale(0.95); }
         .btn-secondary { background: #3a3a40; font-size: 0.9rem; width: 100%; margin-top: 10px; }
 
-        /* LISTE VOD */
         #vod-list { 
             display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; 
             margin-top: 20px; max-height: 50vh; overflow-y: auto; padding: 5px; display: none; 
@@ -73,11 +74,9 @@
         .vod-title { font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .vod-meta { font-size: 0.7rem; color: #aaa; }
 
-        /* VIDEO */
         #video-container { width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 20px; display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
         .plyr { --plyr-color-main: #9146ff; border-radius: 12px; }
 
-        /* OPTIONS */
         #options-bar, .vlc-section { 
             display: none; flex-direction: column; gap: 10px; margin-bottom: 20px; 
             background: #1f1f23; padding: 15px; border-radius: 12px; 
@@ -85,17 +84,13 @@
         select { background: #26262c; color: white; border: 1px solid #3a3a40; padding: 10px; border-radius: 8px; font-size: 1rem; width: 100%; }
         input.vlc-link { width: 100%; font-family: monospace; color: #bf94ff; text-align: center; font-size: 0.8rem; }
 
-        /* STATUT */
         #status-msg { margin-bottom: 15px; font-weight: 500; min-height: 1.2em; font-size: 0.9rem; }
-        .status-loading { color: #e6e619; }
-        .status-success { color: #00ff88; }
-        .status-error { color: #ff4f4d; }
+        .status-loading { color: #e6e619; } .status-success { color: #00ff88; } .status-error { color: #ff4f4d; }
 
         @media (max-width: 600px) { 
             .container { padding: 15px; width: 100%; border-radius: 0; box-shadow: none; } 
-            body { padding: 0; }
-            .search-bar { flex-direction: column; } 
-            button { width: 100%; } 
+            body { padding: 0; } .search-bar { flex-direction: column; } button { width: 100%; } 
+            .lang-switch { top: 10px; right: 10px; }
         }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
@@ -103,15 +98,21 @@
 <body>
 
     <div class="container">
-        <h1>Watch Twitch VODs Without Subscription</h1>
+        <select class="lang-switch" onchange="setLanguage(this.value)">
+            <option value="fr">🇫🇷 FR</option>
+            <option value="en">🇺🇸 EN</option>
+            <option value="es">🇪🇸 ES</option>
+        </select>
+
+        <h1 data-lang="title">Watch Twitch VODs Without Subscription</h1>
         
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('direct')">Lien / ID</button>
-            <button class="tab-btn" onclick="switchTab('channel')">Streamer</button>
+            <button class="tab-btn active" onclick="switchTab('direct')" data-lang="tab_id">Lien / ID</button>
+            <button class="tab-btn" onclick="switchTab('channel')" data-lang="tab_streamer">Streamer</button>
         </div>
 
         <div id="mobile-alert" class="mobile-only">
-            <strong>📱 Mode Mobile</strong> Astuce : utilisez Outplayer ou VLC.
+            <strong data-lang="mobile_title">📱 Mode Mobile</strong> <span data-lang="mobile_desc">Astuce : utilisez Outplayer ou VLC.</span>
             <div style="display:flex; gap:10px; margin-top:10px;">
                 <button class="btn-secondary" style="background:var(--outplayer)" onclick="openInOutplayer()">Outplayer</button>
                 <button class="btn-secondary" style="background:var(--vlc)" onclick="openInVLC_Mobile()">VLC</button>
@@ -120,47 +121,141 @@
 
         <div id="tab-direct" class="tab-content active">
             <div class="search-bar">
-                <input type="text" id="vodInput" placeholder="ID ou Lien de la VOD">
-                <button class="btn-primary" onclick="searchVodById()">Déverrouiller</button>
+                <input type="text" id="vodInput" placeholder="ID ou Lien de la VOD" data-placeholder="ph_id">
+                <button class="btn-primary" onclick="searchVodById()" data-lang="btn_unlock">Déverrouiller</button>
             </div>
         </div>
 
         <div id="tab-channel" class="tab-content">
             <div class="search-bar">
-                <input type="text" id="channelInput" placeholder="Nom du Streamer">
-                <button class="btn-primary" onclick="searchStreamer()">🔍 Chercher (Live & VODs)</button>
+                <input type="text" id="channelInput" placeholder="Nom du Streamer" data-placeholder="ph_streamer">
+                <button class="btn-primary" onclick="searchStreamer()" data-lang="btn_search">🔍 Chercher (Live & VODs)</button>
             </div>
             <div id="live-area"></div>
-            </div>
+        </div>
 
-        <div id="status-msg">Prêt.</div>
+        <div id="status-msg" data-lang="status_ready">Prêt.</div>
 
         <div id="video-container">
             <video id="player" playsinline controls crossorigin></video>
         </div>
 
         <div id="options-bar">
-            <label>Qualité :</label>
+            <label data-lang="lbl_quality">Qualité :</label>
             <select id="qualitySelect" onchange="changeQuality()"></select>
-            <button class="btn-secondary" onclick="togglePiP()" style="background-color: #e6e619; color: black;">📺 Activer PiP</button>
-            <button class="btn-secondary" onclick="downloadM3U8()">📥 Télécharger la vidéo</button>
+            <button class="btn-secondary" onclick="togglePiP()" style="background-color: #e6e619; color: black;" data-lang="btn_pip">📺 Activer PiP</button>
+            <button class="btn-secondary" onclick="downloadM3U8()" data-lang="btn_dl">📥 Télécharger la vidéo</button>
         </div>
 
         <div id="vlc-section" class="vlc-section">
-            <div style="font-size: 0.8rem; color: #aaa;">Lien externe :</div>
+            <div style="font-size: 0.8rem; color: #aaa;" data-lang="lbl_link">Lien externe :</div>
             <input type="text" id="vlcLink" class="vlc-link" readonly onclick="this.select()">
             <div style="display:flex; gap:10px;">
-                <button class="btn-secondary" onclick="copyLink()">Copier</button>
+                <button class="btn-secondary" onclick="copyLink()" data-lang="btn_copy">Copier</button>
                 <button class="btn-secondary mobile-only" style="background:var(--outplayer)" onclick="openInOutplayer()">Outplayer</button>
                 <button class="btn-secondary mobile-only" style="background:var(--vlc)" onclick="openInVLC_Mobile()">VLC App</button>
             </div>
         </div>
 
         <div id="vod-list"></div>
-
     </div>
 
     <script>
+        // --- DICTIONNAIRE DE LANGUES ---
+        const translations = {
+            fr: {
+                title: "Regarder Twitch sans Sub",
+                tab_id: "Lien / ID",
+                tab_streamer: "Streamer",
+                mobile_title: "📱 Mode Mobile",
+                mobile_desc: "Astuce : utilisez Outplayer ou VLC.",
+                ph_id: "ID ou Lien de la VOD",
+                btn_unlock: "Déverrouiller",
+                ph_streamer: "Nom du Streamer",
+                btn_search: "🔍 Chercher (Live & VODs)",
+                status_ready: "Prêt.",
+                lbl_quality: "Qualité :",
+                btn_pip: "📺 Activer PiP",
+                btn_dl: "📥 Télécharger (Fichier)",
+                lbl_link: "Lien externe :",
+                btn_copy: "Copier",
+                err_missing: "Nom manquant.",
+                loading: "Recherche...",
+                live_on: "🔴 EN DIRECT !",
+                btn_watch_live: "▶️ Regarder le Live",
+                live_msg_vod: "En live (mais pas de VODs).",
+                no_vod: "Aucune VOD trouvée.",
+                vods_found: "VODs trouvées.",
+                err_network: "Erreur réseau.",
+                err_live: "Erreur Live.",
+                loading_vod: "Chargement VOD...",
+                vod_ready: "VOD Prête !",
+                err_conn: "Erreur connexion.",
+                copied: "Lien copié !"
+            },
+            en: {
+                title: "Watch Twitch No Sub",
+                tab_id: "Link / ID",
+                tab_streamer: "Streamer",
+                mobile_title: "📱 Mobile Mode",
+                mobile_desc: "Tip: use Outplayer or VLC app.",
+                ph_id: "VOD ID or Link",
+                btn_unlock: "Unlock",
+                ph_streamer: "Streamer Name",
+                btn_search: "🔍 Search (Live & VODs)",
+                status_ready: "Ready.",
+                lbl_quality: "Quality:",
+                btn_pip: "📺 Toggle PiP",
+                btn_dl: "📥 Download (File)",
+                lbl_link: "External Link:",
+                btn_copy: "Copy",
+                err_missing: "Name missing.",
+                loading: "Searching...",
+                live_on: "🔴 LIVE NOW!",
+                btn_watch_live: "▶️ Watch Live",
+                live_msg_vod: "Live is on (but no VODs).",
+                no_vod: "No VODs found.",
+                vods_found: "VODs found.",
+                err_network: "Network error.",
+                err_live: "Live error.",
+                loading_vod: "Loading VOD...",
+                vod_ready: "VOD Ready!",
+                err_conn: "Connection error.",
+                copied: "Link copied!"
+            },
+            es: {
+                title: "Ver Twitch sin Sub",
+                tab_id: "Enlace / ID",
+                tab_streamer: "Streamer",
+                mobile_title: "📱 Modo Móvil",
+                mobile_desc: "Consejo: usa Outplayer o VLC.",
+                ph_id: "ID o Enlace VOD",
+                btn_unlock: "Desbloquear",
+                ph_streamer: "Nombre del Streamer",
+                btn_search: "🔍 Buscar (Live & VODs)",
+                status_ready: "Listo.",
+                lbl_quality: "Calidad:",
+                btn_pip: "📺 Modo PiP",
+                btn_dl: "📥 Descargar",
+                lbl_link: "Enlace externo:",
+                btn_copy: "Copiar",
+                err_missing: "Falta el nombre.",
+                loading: "Buscando...",
+                live_on: "🔴 EN VIVO!",
+                btn_watch_live: "▶️ Ver Directo",
+                live_msg_vod: "En vivo (sin VODs).",
+                no_vod: "No se encontraron VODs.",
+                vods_found: "VODs encontrados.",
+                err_network: "Error de red.",
+                err_live: "Error de directo.",
+                loading_vod: "Cargando VOD...",
+                vod_ready: "VOD Listo!",
+                err_conn: "Error de conexión.",
+                copied: "Enlace copiado!"
+            }
+        };
+
+        let currentLang = 'en'; // Langue par défaut
         let currentLinks = {};
         let hls = null;
         let player = null;
@@ -177,6 +272,15 @@
         };
 
         document.addEventListener('DOMContentLoaded', () => {
+            // Détection automatique de la langue du navigateur
+            const userLang = navigator.language.slice(0, 2);
+            if (translations[userLang]) {
+                setLanguage(userLang);
+                document.querySelector('.lang-switch').value = userLang;
+            } else {
+                setLanguage('fr');
+            }
+
             player = new Plyr('#player', {
                 controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'airplay', 'fullscreen'],
                 settings: ['speed']
@@ -195,8 +299,33 @@
             }
         });
 
-        function setStatus(msg, type) {
-            elements.status.textContent = msg;
+        // --- FONCTION DE TRADUCTION ---
+        function setLanguage(lang) {
+            currentLang = lang;
+            const t = translations[lang];
+            
+            // 1. Traduire les textes simples (data-lang)
+            document.querySelectorAll('[data-lang]').forEach(el => {
+                const key = el.getAttribute('data-lang');
+                if (t[key]) el.textContent = t[key];
+            });
+
+            // 2. Traduire les placeholders (champs de texte)
+            document.querySelectorAll('[data-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-placeholder');
+                if (t[key]) el.placeholder = t[key];
+            });
+        }
+
+        // Helper pour obtenir un texte traduit dans le JS
+        function txt(key) {
+            return translations[currentLang][key] || key;
+        }
+
+        function setStatus(msgKey, type, extra = "") {
+            // Si le message est une clé de traduction, on traduit. Sinon on affiche tel quel.
+            const text = translations[currentLang][msgKey] ? translations[currentLang][msgKey] : msgKey;
+            elements.status.textContent = text + extra;
             elements.status.className = type ? 'status-' + type : '';
         }
 
@@ -207,24 +336,21 @@
             if (tab === 'direct') {
                 document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
                 document.getElementById('tab-direct').classList.add('active');
-                // On cache la liste VOD si on est sur l'onglet Direct
                 if(elements.vodList) elements.vodList.style.display = 'none';
             } else {
                 document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
                 document.getElementById('tab-channel').classList.add('active');
-                // On réaffiche la liste VOD si elle contient des résultats
                 if (elements.vodList && elements.vodList.children.length > 0) {
                     elements.vodList.style.display = 'grid';
                 }
             }
         }
 
-        // --- FONCTION UNIFIÉE : LIVE + VODS ---
         async function searchStreamer() {
             const channelName = document.getElementById('channelInput').value.trim();
-            if (!channelName) return setStatus("Nom manquant.", 'error');
+            if (!channelName) return setStatus("err_missing", 'error');
 
-            setStatus(`Recherche de ${channelName}...`, 'loading');
+            setStatus("loading", 'loading', ` ${channelName}...`);
             elements.vodList.style.display = 'none';
             elements.liveArea.innerHTML = '';
             hidePlayer();
@@ -237,20 +363,21 @@
                 const dataLive = await resLive.json();
 
                 if (!dataLive.error) {
-                    const gameInfo = dataLive.game ? `Joue à : <strong>${dataLive.game}</strong>` : "";
+                    const gameInfo = dataLive.game ? `[${dataLive.game}]` : "";
                     elements.liveArea.innerHTML = `
                         <div style="background: rgba(233, 25, 22, 0.15); border: 2px solid #e91916; padding: 15px; border-radius: 12px; margin-bottom: 25px; animation: fadeIn 0.5s;">
-                            <h3 style="color: #ff4f4d; margin-bottom: 8px;">🔴 EN DIRECT !</h3>
+                            <h3 style="color: #ff4f4d; margin-bottom: 8px;">${txt('live_on')}</h3>
                             <p>${dataLive.title}<br><span style="color:#bbb; font-size:0.9rem;">${gameInfo}</span></p>
-                            <button class="btn-primary" style="background-color: #e91916; width: 100%; margin-top:10px;" onclick="watchLive()">▶️ Regarder le Live</button>
+                            <button class="btn-primary" style="background-color: #e91916; width: 100%; margin-top:10px;" onclick="watchLive()">${txt('btn_watch_live')}</button>
                         </div>`;
                 }
 
                 const dataVods = await resVods.json();
                 if (dataVods.error) {
-                    setStatus(elements.liveArea.innerHTML ? "En live (mais pas de VODs)." : "Aucune VOD trouvée.", elements.liveArea.innerHTML ? 'success' : 'error');
+                    const msg = elements.liveArea.innerHTML ? "live_msg_vod" : "no_vod";
+                    setStatus(msg, elements.liveArea.innerHTML ? 'success' : 'error');
                 } else {
-                    setStatus(`${dataVods.videos.length} VODs trouvées.`, 'success');
+                    setStatus(`${dataVods.videos.length} ${txt('vods_found')}`, 'success');
                     elements.vodList.innerHTML = '';
                     elements.vodList.style.display = 'grid';
                     dataVods.videos.forEach(vod => {
@@ -258,12 +385,12 @@
                         card.className = 'vod-card';
                         card.onclick = () => loadVodFromCard(vod.id);
                         const duration = Math.floor(vod.lengthSeconds / 60) + ' min';
-                        const date = new Date(vod.publishedAt).toLocaleDateString('fr-FR');
+                        const date = new Date(vod.publishedAt).toLocaleDateString(currentLang === 'fr' ? 'fr-FR' : 'en-US');
                         card.innerHTML = `<img src="${vod.previewThumbnailURL}" class="vod-thumb"><div class="vod-info"><div class="vod-title">${vod.title}</div><div class="vod-meta">${date} • ${duration}</div></div>`;
                         elements.vodList.appendChild(card);
                     });
                 }
-            } catch (e) { setStatus("Erreur réseau.", 'error'); }
+            } catch (e) { setStatus("err_network", 'error'); }
         }
 
         async function watchLive() {
@@ -275,7 +402,7 @@
 
                 setupPlayer(data.links);
                 setStatus(`🔴 ${data.title}`, 'success');
-            } catch (e) { setStatus("Erreur Live.", 'error'); }
+            } catch (e) { setStatus("err_live", 'error'); }
         }
 
         function loadVodFromCard(id) {
@@ -287,7 +414,7 @@
         async function searchVodById() {
             const id = (document.getElementById('vodInput').value.match(/\d{8,}/) || [])[0];
             if (!id) return setStatus("ID invalide.", 'error');
-            setStatus("Chargement VOD...", 'loading');
+            setStatus("loading_vod", 'loading');
             hidePlayer();
 
             try {
@@ -296,8 +423,8 @@
                 if (data.error) return setStatus(data.error, 'error');
 
                 setupPlayer(data.links);
-                setStatus("VOD Prête !", 'success');
-            } catch (e) { setStatus("Erreur connexion.", 'error'); }
+                setStatus("vod_ready", 'success');
+            } catch (e) { setStatus("err_conn", 'error'); }
         }
 
         function setupPlayer(links) {
@@ -363,7 +490,7 @@
         function copyLink() {
             elements.vlcInput.select();
             navigator.clipboard.writeText(elements.vlcInput.value);
-            alert("Lien copié !");
+            alert(txt('copied'));
         }
         
         function openInVLC_Mobile() { window.location.href = 'vlc://' + elements.vlcInput.value; }
