@@ -130,33 +130,66 @@ async function storyboardHack(seekPreviewsURL) {
 // Servir les fichiers statiques (CSS/JS/HTML)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- PROXY CORS (Pour contourner le blocage Twitch) ---
+// --- PROXY CORS INTELLIGENT (Gère les m3u8 et les .ts) ---
 app.get('/api/proxy', async (req, res) => {
     const targetUrl = req.query.url;
     if (!targetUrl) return res.status(400).send('URL manquante');
 
+    // Headers pour se faire passer pour Twitch
+    const twitchHeaders = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Referer': 'https://www.twitch.tv/',
+        'Origin': 'https://www.twitch.tv'
+    };
+
     try {
+        // CAS 1 : C'est un fichier Playlist (.m3u8)
+        // On doit le télécharger en TEXTE, modifier les liens dedans, puis l'envoyer.
+        if (targetUrl.includes('.m3u8')) {
+            const response = await axios.get(targetUrl, { 
+                headers: twitchHeaders,
+                responseType: 'text' // Important : on veut manipuler le texte
+            });
+
+            // On trouve le dossier de base de la vidéo sur Twitch (ex: https://.../chunked/)
+            const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
+            
+            // On parcourt le fichier ligne par ligne
+            const newContent = response.data.split('\n').map(line => {
+                const l = line.trim();
+                // Si la ligne est vide ou commence par # (info technique), on la garde telle quelle
+                if (!l || l.startsWith('#')) return l; 
+                
+                // Sinon, c'est un lien vers un segment vidéo (.ts) !
+                // On reconstruit le lien complet vers Twitch
+                const fullLink = l.startsWith('http') ? l : baseUrl + l;
+                
+                // ET ON L'ENROBE DANS NOTRE PROXY pour que le lecteur repasse par nous
+                return `/api/proxy?url=${encodeURIComponent(fullLink)}`;
+            }).join('\n');
+
+            // On envoie le fichier modifié
+            res.set('Access-Control-Allow-Origin', '*');
+            res.set('Content-Type', 'application/vnd.apple.mpegurl');
+            return res.send(newContent);
+        }
+
+        // CAS 2 : C'est un segment vidéo (.ts) ou autre
+        // On fait juste "passe-plat" (Stream) sans rien toucher
         const response = await axios({
             url: targetUrl,
             method: 'GET',
-            responseType: 'stream', // Important pour les fichiers vidéo/texte
-            headers: {
-                // On se fait passer pour le site officiel Twitch
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Referer': 'https://www.twitch.tv/',
-                'Origin': 'https://www.twitch.tv'
-            }
+            responseType: 'stream',
+            headers: twitchHeaders
         });
 
-        // On autorise tout le monde (CORS)
         res.set('Access-Control-Allow-Origin', '*');
         res.set('Content-Type', response.headers['content-type']);
-
-        // On envoie les données reçues vers le navigateur
         response.data.pipe(res);
+
     } catch (e) {
         console.error("Erreur Proxy:", e.message);
-        res.status(500).send('Erreur lors du proxy');
+        if (!res.headersSent) res.status(500).send('Erreur lors du proxy');
     }
 });
 // --- ROUTES ---
@@ -209,4 +242,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Serveur prêt sur le port ${PORT}`);
 });
+
 
