@@ -299,7 +299,86 @@
 
             } catch (e) { setStatus("Erreur serveur.", 'error'); }
         }
+// --- NOUVELLE FONCTION : CHERCHE LIVE + VODS EN MÊME TEMPS ---
+        async function searchStreamer() {
+            const channelName = document.getElementById('channelInput').value.trim();
+            if (!channelName) return setStatus("Nom manquant.", 'error');
 
+            // 1. Reset de l'interface
+            setStatus(`Recherche de ${channelName}...`, 'loading');
+            vodList.style.display = 'none';
+            hidePlayer(); 
+            
+            const liveArea = document.getElementById('live-area');
+            liveArea.innerHTML = ''; // On efface l'ancien statut Live
+
+            // 2. On lance les deux recherches en PARALLÈLE (plus rapide)
+            const pVods = fetch(`/api/get-channel-videos?name=${channelName}`);
+            const pLive = fetch(`/api/get-live?name=${channelName}`);
+
+            try {
+                // On attend les deux réponses
+                const [resVods, resLive] = await Promise.all([pVods, pLive]);
+                
+                // --- A) TRAITEMENT DU LIVE ---
+                const dataLive = await resLive.json();
+                
+                // Si pas d'erreur, c'est qu'il est EN LIGNE
+                if (!dataLive.error) {
+                    const gameInfo = dataLive.game ? `Joue à : <strong>${dataLive.game}</strong>` : "";
+                    
+                    // On injecte le panneau Live au dessus des VODs
+                    liveArea.innerHTML = `
+                        <div style="background: rgba(233, 25, 22, 0.15); border: 2px solid #e91916; padding: 15px; border-radius: 12px; margin-bottom: 25px; text-align: center; animation: fadeIn 0.5s;">
+                            <h3 style="color: #ff4f4d; margin-bottom: 8px; font-size: 1.2rem;">🔴 ${channelName} est EN DIRECT !</h3>
+                            <p style="color: #fff; margin-bottom: 15px;">${dataLive.title} <br> <span style="color:#bbb; font-size:0.9rem;">${gameInfo}</span></p>
+                            <button class="btn-primary" style="background-color: #e91916; width: 100%; font-weight: bold;" onclick="watchLive()">
+                                ▶️ Regarder le Live maintenant
+                            </button>
+                        </div>
+                    `;
+                }
+
+                // --- B) TRAITEMENT DES VODS ---
+                const dataVods = await resVods.json();
+                
+                if (dataVods.error) {
+                     if (liveArea.innerHTML === '') setStatus("Aucune VOD trouvée.", 'error');
+                     else setStatus("En live (mais pas de VODs).", 'success');
+                } else {
+                    setStatus(`${dataVods.videos.length} VODs trouvées.`, 'success');
+                    vodList.innerHTML = '';
+                    vodList.style.display = 'grid';
+
+                    // Création des cartes VOD (Code standard)
+                    dataVods.videos.forEach(vod => {
+                        const card = document.createElement('div');
+                        card.className = 'vod-card';
+                        card.onclick = () => loadVodFromCard(vod.id); 
+
+                        const minutes = Math.floor(vod.lengthSeconds / 60);
+                        const hours = Math.floor(minutes / 60);
+                        const remainingMin = minutes % 60;
+                        const durationStr = hours > 0 ? `${hours}h${remainingMin}` : `${minutes}min`;
+                        const dateStr = new Date(vod.publishedAt).toLocaleDateString('fr-FR');
+
+                        card.innerHTML = `
+                            <img src="${vod.previewThumbnailURL}" class="vod-thumb" loading="lazy">
+                            <div class="vod-info">
+                                <div class="vod-title">${vod.title}</div>
+                                <div class="vod-meta">${dateStr} • ${durationStr}</div>
+                            </div>
+                        `;
+                        vodList.appendChild(card);
+                    });
+                }
+
+            } catch (e) {
+                setStatus("Erreur lors de la recherche.", 'error');
+                console.error(e);
+            }
+        }
+        
 async function watchLive() {
             const channelName = document.getElementById('channelInput').value.trim();
             if (!channelName) return setStatus("Nom du streamer manquant.", 'error');
@@ -503,3 +582,4 @@ async function watchLive() {
     </script>
 </body>
 </html>
+
