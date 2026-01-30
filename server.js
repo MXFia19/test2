@@ -232,28 +232,68 @@ async function getLiveAccessToken(login) {
     }
 }
 // --- AJOUT : ROUTE API POUR LE LIVE ---
+// --- ROUTE API POUR LE LIVE (Avec multi-qualités) ---
 app.get('/api/get-live', async (req, res) => {
     const channelName = req.query.name;
     if (!channelName) return res.status(400).json({ error: 'Nom de chaîne manquant' });
     
-    // On nettoie le nom (minuscules + sans espaces)
     const cleanName = channelName.trim().toLowerCase();
-    
     console.log(`\n🔴 Recherche LIVE : ${cleanName}`);
 
     const tokenData = await getLiveAccessToken(cleanName);
-    
-    // Si tokenData est null, c'est que le live est OFF ou introuvable
     if (!tokenData) {
         return res.status(404).json({ error: "Live introuvable (Offline ou Pseudo invalide)." });
     }
 
-    const url = `https://usher.ttvnw.net/api/channel/hls/${cleanName}.m3u8?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&playlist_include_framerate=true&segment_preference=4&sig=${tokenData.signature}&token=${tokenData.value}`;
+    // 1. On construit l'URL Master (celle qui contient toutes les qualités)
+    const masterUrl = `https://usher.ttvnw.net/api/channel/hls/${cleanName}.m3u8?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&playlist_include_framerate=true&segment_preference=4&sig=${tokenData.signature}&token=${tokenData.value}`;
 
-    return res.json({ 
-        links: { "Auto (Live)": url }, 
-        best: url 
-    });
+    try {
+        // 2. On télécharge le fichier playlist pour voir les qualités
+        const response = await axios.get(masterUrl, {
+            headers: { 
+                'Client-ID': CLIENT_ID, // Utilise la constante définie plus haut
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            }
+        });
+
+        // 3. On analyse le texte pour trouver les liens
+        const lines = response.data.split('\n');
+        let links = { "Auto (Multi-qualités)": masterUrl }; // On met Auto par défaut
+        
+        let lastInfo = "";
+        
+        lines.forEach(line => {
+            if (line.startsWith('#EXT-X-STREAM-INF')) {
+                // On essaie de trouver la résolution ou le nom
+                // Ex: ...RESOLUTION=1920x1080,VIDEO="chunked"
+                const resMatch = line.match(/RESOLUTION=(\d+x\d+)/);
+                const nameMatch = line.match(/VIDEO="([^"]+)"/);
+                
+                let qualityName = "Inconnue";
+                if (nameMatch) qualityName = nameMatch[1]; // ex: "chunked" ou "720p60"
+                if (resMatch) qualityName += ` (${resMatch[1]})`;
+                
+                // On nettoie le nom pour faire joli
+                if (qualityName.includes('chunked')) qualityName = "Source (Best)";
+                
+                lastInfo = qualityName;
+            } else if (line.startsWith('http')) {
+                // C'est le lien qui va avec la ligne d'avant
+                if (lastInfo) {
+                    links[lastInfo] = line;
+                    lastInfo = "";
+                }
+            }
+        });
+
+        return res.json({ links: links, best: masterUrl });
+
+    } catch (e) {
+        console.log("Erreur parsing M3U8 Live:", e.message);
+        // Si erreur d'analyse, on renvoie au moins le lien Auto
+        return res.json({ links: { "Auto (Live)": masterUrl }, best: masterUrl });
+    }
 });
 
 // --- ROUTES ---
@@ -306,6 +346,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Serveur prêt sur le port ${PORT}`);
 });
+
 
 
 
