@@ -193,15 +193,20 @@ app.get('/api/proxy', async (req, res) => {
     }
 });
 
-// --- FONCTION CORRIGÉE (Minuscules + DeviceID) ---
+// --- FONCTION CORRIGÉE (Query nettoyée) ---
 async function getLiveAccessToken(login) {
-    // 1. Force le pseudo en minuscules (INDISPENSABLE)
+    // 1. Force le pseudo en minuscules (Toujours important)
     const cleanLogin = login.toLowerCase();
 
     const data = {
         operationName: "PlaybackAccessToken_Template",
-        query: "query PlaybackAccessToken_Template($login: String!, $isLive: Boolean!, $vodID: ID!, $isVod: Boolean!, $playerType: String!) { streamPlaybackAccessToken(channelName: $login, params: {platform: \"web\", playerBackend: \"mediaplayer\", playerType: $playerType}) @include(if: $isLive) { value signature __typename } }",
-        variables: { isLive: true, login: cleanLogin, isVod: false, vodID: "", playerType: "site" }
+        // CORRECTION ICI : J'ai retiré $vodID et $isVod qui causaient l'erreur
+        query: "query PlaybackAccessToken_Template($login: String!, $isLive: Boolean!, $playerType: String!) { streamPlaybackAccessToken(channelName: $login, params: {platform: \"web\", playerBackend: \"mediaplayer\", playerType: $playerType}) @include(if: $isLive) { value signature __typename } }",
+        variables: { 
+            isLive: true, 
+            login: cleanLogin, 
+            playerType: "site" 
+        }
     };
 
     try {
@@ -211,12 +216,10 @@ async function getLiveAccessToken(login) {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
                 'Referer': 'https://www.twitch.tv/',
                 'Origin': 'https://www.twitch.tv',
-                // Ajout d'un Device-ID aléatoire pour éviter le blocage
                 'Device-ID': 'MkMq8a9' + Math.random().toString(36).substring(2, 15)
             } 
         });
 
-        // Si Twitch renvoie une erreur explicite
         if (response.data.errors) {
             console.log(`[Erreur GQL] ${JSON.stringify(response.data.errors)}`);
             return null;
@@ -303,6 +306,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Serveur prêt sur le port ${PORT}`);
 });
+
 
 
 
