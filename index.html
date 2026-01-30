@@ -25,18 +25,26 @@
             border-radius: 16px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); text-align: center; position: relative;
         }
 
-        /* --- SÉLECTEUR DE LANGUE (TEXTE SIMPLE) --- */
+        /* --- NOUVELLE BARRE D'EN-TÊTE (Gestion du positionnement) --- */
+        .header-top {
+            display: flex;
+            justify-content: flex-end; /* PC : Aligné à droite */
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        /* STYLE DU BOUTON LANGUE */
         .lang-switch {
-            position: absolute; top: 20px; right: 20px;
             background: #26262c; border: 1px solid #3a3a40; color: #fff;
             padding: 8px 12px; border-radius: 8px; cursor: pointer; 
             font-size: 0.9rem; font-weight: 600; text-transform: uppercase;
             transition: 0.2s;
+            /* Plus de position absolute ici ! */
         }
         .lang-switch:hover { background: #3a3a40; border-color: var(--primary); }
         .lang-switch:focus { outline: none; border-color: var(--primary); }
 
-        h1 { font-weight: 800; margin-bottom: 20px; color: #bf94ff; font-size: 1.5rem; margin-top: 10px; }
+        h1 { font-weight: 800; margin-bottom: 20px; color: #bf94ff; font-size: 1.5rem; margin-top: 0; }
 
         #mobile-alert { 
             display: none; background: rgba(145, 70, 255, 0.15); border: 1px solid var(--primary); 
@@ -92,19 +100,13 @@
         #status-msg { margin-bottom: 15px; font-weight: 500; min-height: 1.2em; font-size: 0.9rem; }
         .status-loading { color: #e6e619; } .status-success { color: #00ff88; } .status-error { color: #ff4f4d; }
 
-        /* --- MODE MOBILE (CORRECTION CHEVAUCHEMENT) --- */
+        /* --- MOBILE : CENTRAGE --- */
         @media (max-width: 600px) { 
             .container { padding: 15px; width: 100%; border-radius: 0; box-shadow: none; } 
             body { padding: 0; } .search-bar { flex-direction: column; } button { width: 100%; } 
             
-            /* On remet le bouton dans le flux normal (pas absolute) */
-            .lang-switch { 
-                position: static; 
-                display: block; 
-                margin: 0 auto 15px auto; /* Centré au-dessus du titre */
-                width: auto;
-                max-width: 150px;
-            }
+            /* Mobile : On centre le bouton langue */
+            .header-top { justify-content: center; margin-bottom: 15px; }
         }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
@@ -112,11 +114,14 @@
 <body>
 
     <div class="container">
-        <select class="lang-switch" onchange="setLanguage(this.value)">
-            <option value="fr">FR</option>
-            <option value="en">EN</option>
-            <option value="es">ES</option>
-        </select>
+        
+        <div class="header-top">
+            <select class="lang-switch" onchange="setLanguage(this.value)">
+                <option value="fr">FR</option>
+                <option value="en">EN</option>
+                <option value="es">ES</option>
+            </select>
+        </div>
 
         <h1 data-lang="title">Watch Twitch VODs Without Subscription</h1>
         
