@@ -153,7 +153,7 @@
             <div class="search-bar">
                 <input type="text" id="channelInput" placeholder="Nom du Streamer">
                 <button class="btn-primary" onclick="searchChannel()">Chercher VODs</button>
-                <button class="btn-primary" onclick="watchLive()" style="background-color: #e91916; margin-left: 5px;">🔴 Voir Live</button>
+                <button class="btn-primary" onclick="()" style="background-color: #e91916; margin-left: 5px;">🔴 Voir Live</button>
             </div>
             <div id="vod-list"></div>
         </div>
@@ -298,7 +298,7 @@
             } catch (e) { setStatus("Erreur serveur.", 'error'); }
         }
 
-        async function watchLive() {
+async function watchLive() {
             const channelName = document.getElementById('channelInput').value.trim();
             if (!channelName) return setStatus("Nom du streamer manquant.", 'error');
 
@@ -317,22 +317,25 @@
 
                 currentLinks = data.links;
                 
-                // Mise à jour du selecteur de qualité
-                qualitySelect.innerHTML = '';
-                const option = document.createElement('option');
-                option.value = "Auto (Live)";
-                option.textContent = "Live (Source)";
-                qualitySelect.appendChild(option);
-
-                setStatus("🔴 Live trouvé !", 'success');
-                showPlayer();
+                // --- 1. AFFICHER LE TITRE ET LE JEU ---
+                const gameInfo = data.game ? `[${data.game}]` : "";
+                setStatus(`🔴 ${gameInfo} ${data.title}`, 'success'); 
                 
-                // Lancement via le Proxy (comme pour les VODs)
+                // --- 2. CRÉER LA LISTE DES QUALITÉS ---
+                qualitySelect.innerHTML = '';
+                for (const [quality, url] of Object.entries(currentLinks)) {
+                    const option = document.createElement('option');
+                    option.value = quality;
+                    // On met en majuscules pour faire propre (ex: "SOURCE (BEST)")
+                    option.textContent = quality.toUpperCase();
+                    qualitySelect.appendChild(option);
+                }
+
+                showPlayer();
                 changeQuality(); 
 
             } catch (e) { setStatus("Erreur ou streamer hors ligne.", 'error'); }
         }
-
         function loadVodFromCard(id) {
             document.getElementById('vodInput').value = id;
             switchTab('direct');
@@ -498,6 +501,7 @@
     </script>
 </body>
 </html>
+
 
 
 
