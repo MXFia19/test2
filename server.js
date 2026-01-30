@@ -252,6 +252,8 @@ async function getStreamMetadata(login) {
     } catch (e) { return null; }
 }
 
+
+
 // --- ROUTE API POUR LE LIVE (Strict Mode : Offline = Erreur) ---
 app.get('/api/get-live', async (req, res) => {
     const channelName = req.query.name;
@@ -381,6 +383,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Serveur prêt sur le port ${PORT}`);
 });
+
 
 
 
