@@ -322,22 +322,31 @@
         }
 
         function changeQuality() {
-            const url = currentLinks[qualitySelect.value];
-            if (!url) return;
-            vlcInput.value = url;
+    const rawUrl = currentLinks[qualitySelect.value];
+    if (!rawUrl) return;
 
-            if (Hls.isSupported()) {
-                if (hls) hls.destroy();
-                hls = new Hls();
-                hls.loadSource(url);
-                hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(()=>{}));
-            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = url;
-                video.play();
-            }
-        }
+    // --- MODIFICATION ICI : On passe par le proxy ---
+    // On encode l'URL pour qu'elle passe bien dans les paramètres
+    const proxyUrl = `/api/proxy?url=${encodeURIComponent(rawUrl)}`;
+    
+    // On met à jour l'input VLC avec le VRAI lien (pour copier-coller)
+    vlcInput.value = rawUrl; 
 
+    if (Hls.isSupported()) {
+        if (hls) hls.destroy();
+        hls = new Hls();
+        
+        // On charge l'URL du PROXY dans le lecteur
+        hls.loadSource(proxyUrl);
+        
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(()=>{}));
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Pour Safari (iPhone), on utilise aussi le proxy
+        video.src = proxyUrl;
+        video.play();
+    }
+}
         function extractVodId(input) {
             const match = input.match(/(?:videos\/|v\/)?(\d{8,})/);
             return match ? match[1] : input.trim();
@@ -412,4 +421,5 @@
     </script>
 </body>
 </html>
+
 
