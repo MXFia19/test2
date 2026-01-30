@@ -9,7 +9,7 @@ app.use(express.json());
 
 const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 
-// ORDRE DE TRI QUALITÉ
+// Ordre utilisé uniquement pour le mode "Backup" (Storyboard)
 const QUALITY_ORDER = [
     'chunked', 'source', '1080p60', '1080p30', '720p60', '720p30', '480p30', '360p30', '160p30', 'audio_only'
 ];
@@ -231,24 +231,49 @@ app.get('/api/get-m3u8', async (req, res) => {
     res.status(404).json({ error: "VOD introuvable." });
 });
 
-// Fonction d'aide pour lire les M3U8
+// --- FONCTION DE PARSING AVEC TRI AUTOMATIQUE ---
 function parseM3U8(content, masterUrl) {
     const lines = content.split('\n');
-    let links = { "Auto": masterUrl };
+    let unsortedLinks = {};
     let lastInfo = "";
+
+    // 1. Extraction des qualités
     lines.forEach(line => {
         if (line.startsWith('#EXT-X-STREAM-INF')) {
             const resMatch = line.match(/RESOLUTION=(\d+x\d+)/);
             const nameMatch = line.match(/VIDEO="([^"]+)"/);
+            
             let qualityName = nameMatch ? nameMatch[1] : "Inconnue";
             if (resMatch) qualityName += ` (${resMatch[1]})`;
             if (qualityName.includes('chunked')) qualityName = "Source (Best)";
+            
             lastInfo = qualityName;
         } else if (line.startsWith('http')) {
-            if (lastInfo) { links[lastInfo] = line; lastInfo = ""; }
+            if (lastInfo) { unsortedLinks[lastInfo] = line; lastInfo = ""; }
         }
     });
-    return links;
+
+    // 2. Création de la liste triée
+    // On met "Auto" en tout premier
+    let sortedLinks = { "Auto": masterUrl };
+    
+    // Ordre de priorité d'affichage
+    const displayOrder = ["Source", "1080p60", "1080p30", "1080p", "720p60", "720p30", "720p", "480p", "360p", "160p", "audio_only"];
+
+    // On parcourt notre ordre préféré et on cherche si la qualité existe
+    displayOrder.forEach(keyPart => {
+        Object.keys(unsortedLinks).forEach(k => {
+            if (k.toLowerCase().includes(keyPart.toLowerCase())) {
+                sortedLinks[k] = unsortedLinks[k];
+                delete unsortedLinks[k]; // On l'enlève pour ne pas le remettre
+            }
+        });
+    });
+
+    // On ajoute tout ce qui reste (les qualités bizarres ou oubliées)
+    Object.assign(sortedLinks, unsortedLinks);
+
+    return sortedLinks;
 }
 
 app.use(express.static(path.join(__dirname, 'public')));
