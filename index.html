@@ -298,6 +298,41 @@
             } catch (e) { setStatus("Erreur serveur.", 'error'); }
         }
 
+        async function watchLive() {
+            const channelName = document.getElementById('channelInput').value.trim();
+            if (!channelName) return setStatus("Nom du streamer manquant.", 'error');
+
+            setStatus(`Recherche du Live de ${channelName}...`, 'loading');
+            vodList.style.display = 'none';
+            hidePlayer();
+
+            try {
+                const response = await fetch(`/api/get-live?name=${channelName}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    setStatus(data.error, 'error');
+                    return;
+                }
+
+                currentLinks = data.links;
+                
+                // Mise à jour du selecteur de qualité
+                qualitySelect.innerHTML = '';
+                const option = document.createElement('option');
+                option.value = "Auto (Live)";
+                option.textContent = "Live (Source)";
+                qualitySelect.appendChild(option);
+
+                setStatus("🔴 Live trouvé !", 'success');
+                showPlayer();
+                
+                // Lancement via le Proxy (comme pour les VODs)
+                changeQuality(); 
+
+            } catch (e) { setStatus("Erreur ou streamer hors ligne.", 'error'); }
+        }
+
         function loadVodFromCard(id) {
             document.getElementById('vodInput').value = id;
             switchTab('direct');
@@ -463,6 +498,7 @@
     </script>
 </body>
 </html>
+
 
 
 
