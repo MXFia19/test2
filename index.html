@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Watch Twitch VODs Without Subscription</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #9146ff; --dark: #0e0e10; --card: #18181b; --text: #efeff1; --danger: #ff4f4d; --outplayer: #007aff; --vlc: #ff8800; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Inter', sans-serif; background-color: var(--dark); color: var(--text);
+            display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px;
+        }
+
+        .container {
+            width: 100%; max-width: 900px; background: var(--card); padding: 25px;
+            border-radius: 16px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); text-align: center;
+        }
+
+        h1 { font-weight: 800; margin-bottom: 20px; color: #bf94ff; font-size: 1.5rem; }
+
+        /* ALERTE MOBILE */
+        #mobile-alert {
+            display: none;
+            background-color: rgba(145, 70, 255, 0.15);
+            border: 1px solid var(--primary);
+            color: #e0ccff;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: left;
+            font-size: 0.9rem;
+            animation: fadeIn 0.5s;
+        }
+        #mobile-alert strong { color: var(--primary); display: block; margin-bottom: 5px; }
+        
+        /* TABS */
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; background: #26262c; padding: 5px; border-radius: 12px; }
+        .tab-btn {
+            flex: 1; background: transparent; border: none; color: #aaa; padding: 10px;
+            border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.3s;
+        }
+        .tab-btn.active { background: var(--card); color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .tab-content { display: none; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+
+        /* INPUTS */
+        .search-bar { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap;}
+        input[type="text"] {
+            background: #26262c; border: 2px solid #3a3a40; color: white; padding: 12px;
+            border-radius: 10px; font-size: 1rem; flex: 1; min-width: 200px; transition: 0.2s;
+        }
+        input[type="text"]:focus { outline: none; border-color: var(--primary); }
+        
+        button {
+            border: none; padding: 12px 20px; border-radius: 10px; font-weight: 600; cursor: pointer;
+            font-size: 1rem; color: white; transition: 0.2s; white-space: nowrap;
+        }
+        .btn-primary { background: var(--primary); }
+        .btn-primary:active { transform: scale(0.95); }
+        .btn-secondary { background: #3a3a40; font-size: 0.9rem; width: 100%; margin-top: 10px; }
+        
+        /* Boutons d'action */
+        .action-buttons { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+        .action-buttons button { flex: 1; min-width: 120px; }
+
+        /* Classes utilitaires */
+        .mobile-only { display: none; }
+
+        /* GRILLE VOD */
+        #vod-list {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px;
+            margin-top: 20px; max-height: 50vh; overflow-y: auto; padding: 5px; display: none;
+        }
+        .vod-card {
+            background: #26262c; border-radius: 10px; overflow: hidden; cursor: pointer; text-align: left;
+        }
+        .vod-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; }
+        .vod-info { padding: 8px; }
+        .vod-title { font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .vod-meta { font-size: 0.7rem; color: #aaa; }
+
+        /* VIDEO & PLYR */
+        #video-container {
+            width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 20px; display: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+        }
+        .plyr { --plyr-color-main: #9146ff; border-radius: 12px; }
+
+        #options-bar {
+            display: none; flex-direction: column; gap: 10px; margin-bottom: 20px;
+            background: #1f1f23; padding: 15px; border-radius: 12px;
+        }
+        select {
+            background: #26262c; color: white; border: 1px solid #3a3a40; padding: 10px;
+            border-radius: 8px; font-size: 1rem; width: 100%;
+        }
+
+        .vlc-section {
+            background: #1f1f23; padding: 15px; border-radius: 12px; border: 1px solid #333;
+            display: none; flex-direction: column; gap: 10px; margin-top: 20px;
+        }
+        input.vlc-link { width: 100%; font-family: monospace; color: #bf94ff; text-align: center; font-size: 0.8rem; }
+
+        #status-msg { margin-bottom: 15px; font-weight: 500; min-height: 1.2em; font-size: 0.9rem; }
+        .status-loading { color: #e6e619; }
+        .status-success { color: #00ff88; }
+        .status-error { color: #ff4f4d; }
+
+        @media (max-width: 600px) {
+            .container { padding: 15px; width: 100%; border-radius: 0; box-shadow: none; }
+            body { padding: 0; }
+            .search-bar { flex-direction: column; }
+            button { width: 100%; }
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Watch Twitch VODs Without Subscription</h1>
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('direct')">Lien / ID</button>
+            <button class="tab-btn" onclick="switchTab('channel')">Streamer</button>
+        </div>
+
+        <div id="mobile-alert" class="mobile-only">
+            <strong>📱 Mode Mobile</strong>
+            Astuce : utilisez Outplayer ou VLC pour une meilleure lecture.
+            <div class="action-buttons" style="margin-top:10px;">
+                <button class="btn-secondary" style="background:var(--outplayer)" onclick="openInOutplayer()">Outplayer</button>
+                <button class="btn-secondary" style="background:var(--vlc)" onclick="openInVLC_Mobile()">VLC</button>
+            </div>
+        </div>
+
+        <div id="tab-direct" class="tab-content active">
+            <div class="search-bar">
+                <input type="text" id="vodInput" placeholder="ID ou Lien de la VOD">
+                <button class="btn-primary" onclick="searchVodById()">Déverrouiller</button>
+            </div>
+        </div>
+
+        <div id="tab-channel" class="tab-content">
+            <div class="search-bar">
+                <input type="text" id="channelInput" placeholder="Nom du Streamer">
+                <button class="btn-primary" onclick="searchChannel()">Chercher</button>
+            </div>
+            <div id="vod-list"></div>
+        </div>
+
+        <div id="status-msg">Prêt.</div>
+
+        <div id="video-container">
+            <video id="player" playsinline controls crossorigin></video>
+        </div>
+
+        <div id="options-bar">
+            <label>Qualité :</label>
+            <select id="qualitySelect" onchange="changeQuality()"></select>
+            <button class="btn-secondary" onclick="downloadM3U8()">📥 Télécharger la vidéo (Fichier)</button>
+        </div>
+
+        <div id="vlc-section" class="vlc-section">
+            <div style="font-size: 0.8rem; color: #aaa;">Lien externe / Lecteur :</div>
+            <input type="text" id="vlcLink" class="vlc-link" readonly onclick="this.select()">
+            
+            <div class="action-buttons">
+                <button class="btn-secondary" onclick="copyLink()">Copier</button>
+                
+                <button class="btn-secondary mobile-only" style="background:var(--outplayer)" onclick="openInOutplayer()">Outplayer</button>
+                <button class="btn-secondary mobile-only" style="background:var(--vlc)" onclick="openInVLC_Mobile()">VLC App</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentLinks = {};
+        let hls = null;
+        let player = null;
+
+        const statusEl = document.getElementById('status-msg');
+        const mobileAlert = document.getElementById('mobile-alert');
+        const optionsBar = document.getElementById('options-bar');
+        const qualitySelect = document.getElementById('qualitySelect');
+        const videoContainer = document.getElementById('video-container');
+        const vlcSection = document.getElementById('vlc-section');
+        const video = document.getElementById('player');
+        const vlcInput = document.getElementById('vlcLink');
+        const vodList = document.getElementById('vod-list');
+
+        document.addEventListener('DOMContentLoaded', () => {
+            player = new Plyr(video, {
+                controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'fullscreen'],
+                settings: ['speed']
+            });
+
+            if (isMobile()) {
+                document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
+            }
+        });
+
+        function isMobile() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+
+        function setStatus(msg, type) {
+            statusEl.textContent = msg;
+            statusEl.className = type ? 'status-' + type : '';
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            if (tab === 'direct') {
+                document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+                document.getElementById('tab-direct').classList.add('active');
+            } else {
+                document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+                document.getElementById('tab-channel').classList.add('active');
+            }
+        }
+
+        async function searchChannel() {
+            const channelName = document.getElementById('channelInput').value.trim();
+            if (!channelName) return setStatus("Nom manquant.", 'error');
+
+            setStatus(`Recherche...`, 'loading');
+            vodList.style.display = 'none';
+            hidePlayer();
+
+            try {
+                const response = await fetch(`/api/get-channel-videos?name=${channelName}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    setStatus(data.error, 'error');
+                    return;
+                }
+
+                setStatus(`${data.videos.length} VODs trouvées.`, 'success');
+                vodList.innerHTML = '';
+                vodList.style.display = 'grid';
+
+                data.videos.forEach(vod => {
+                    const card = document.createElement('div');
+                    card.className = 'vod-card';
+                    card.onclick = () => loadVodFromCard(vod.id); 
+
+                    const minutes = Math.floor(vod.lengthSeconds / 60);
+                    const hours = Math.floor(minutes / 60);
+                    const remainingMin = minutes % 60;
+                    const durationStr = hours > 0 ? `${hours}h${remainingMin}` : `${minutes}min`;
+                    const dateStr = new Date(vod.publishedAt).toLocaleDateString('fr-FR');
+
+                    card.innerHTML = `
+                        <img src="${vod.previewThumbnailURL}" class="vod-thumb" loading="lazy">
+                        <div class="vod-info">
+                            <div class="vod-title">${vod.title}</div>
+                            <div class="vod-meta">${dateStr} • ${durationStr}</div>
+                        </div>
+                    `;
+                    vodList.appendChild(card);
+                });
+
+            } catch (e) { setStatus("Erreur serveur.", 'error'); }
+        }
+
+        function loadVodFromCard(id) {
+            document.getElementById('vodInput').value = id;
+            switchTab('direct');
+            searchVodById();
+        }
+
+        async function searchVodById() {
+            const input = document.getElementById('vodInput').value;
+            const vodId = extractVodId(input);
+            if (!vodId) return setStatus("ID invalide.", 'error');
+
+            setStatus("Déverrouillage...", 'loading');
+            hidePlayer();
+
+            try {
+                const response = await fetch(`/api/get-m3u8?id=${vodId}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    setStatus(data.error, 'error');
+                    return;
+                }
+
+                currentLinks = data.links;
+                qualitySelect.innerHTML = '';
+                
+                for (const [quality, url] of Object.entries(currentLinks)) {
+                    const option = document.createElement('option');
+                    option.value = quality;
+                    option.textContent = formatQualityName(quality);
+                    qualitySelect.appendChild(option);
+                }
+
+                setStatus("VOD Prête !", 'success');
+                showPlayer();
+                changeQuality();
+
+            } catch (e) { setStatus("Erreur de connexion.", 'error'); }
+        }
+
+        function changeQuality() {
+            const url = currentLinks[qualitySelect.value];
+            if (!url) return;
+            vlcInput.value = url;
+
+            if (Hls.isSupported()) {
+                if (hls) hls.destroy();
+                hls = new Hls();
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(()=>{}));
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = url;
+                video.play();
+            }
+        }
+
+        function extractVodId(input) {
+            const match = input.match(/(?:videos\/|v\/)?(\d{8,})/);
+            return match ? match[1] : input.trim();
+        }
+
+        function formatQualityName(key) {
+            if (key === 'chunked' || key === 'source') return 'Source';
+            if (key === 'audio_only') return 'Audio';
+            return key.replace(/p(\d+)/, 'p ($1fps)').toUpperCase();
+        }
+
+        // --- NOUVELLE FONCTION DE TÉLÉCHARGEMENT ---
+        // Cette version crée un vrai fichier .m3u8 au lieu d'ouvrir un onglet
+        function downloadM3U8() {
+            const url = vlcInput.value;
+            if (!url) return alert("Aucune vidéo chargée !");
+
+            // Contenu du fichier playlist
+            const m3uContent = `#EXTM3U\n#EXTINF:-1,Twitch VOD\n${url}`;
+            
+            // Création du fichier "virtuel"
+            const blob = new Blob([m3uContent], { type: 'audio/x-mpegurl' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'twitch_vod.m3u'; // Nom du fichier
+            
+            // Clic automatique
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function copyLink() {
+            vlcInput.select();
+            navigator.clipboard.writeText(vlcInput.value);
+            const btn = document.querySelector('.action-buttons button:first-child');
+            const oldText = btn.textContent;
+            btn.textContent = "Copié !";
+            btn.style.background = "#28a745";
+            setTimeout(() => { 
+                btn.textContent = oldText; 
+                btn.style.background = ""; 
+            }, 2000);
+        }
+
+        // --- FONCTIONS MOBILES ---
+        function openInVLC_Mobile() {
+            const url = vlcInput.value;
+            if (url) window.location.href = 'vlc://' + url;
+            else alert("Chargez une vidéo d'abord !");
+        }
+
+        function openInOutplayer() {
+            const url = vlcInput.value;
+            if (url) window.location.href = 'outplayer://' + url;
+            else alert("Chargez une vidéo d'abord !");
+        }
+
+        function hidePlayer() {
+            optionsBar.style.display = 'none';
+            videoContainer.style.display = 'none';
+            vlcSection.style.display = 'none';
+            if (hls) { hls.destroy(); hls = null; }
+            player.stop();
+        }
+
+        function showPlayer() {
+            optionsBar.style.display = 'flex';
+            videoContainer.style.display = 'block';
+            vlcSection.style.display = 'flex';
+        }
+    </script>
+</body>
+</html>
