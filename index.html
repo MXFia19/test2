@@ -22,27 +22,35 @@
 
         .container { 
             width: 100%; max-width: 900px; background: var(--card); padding: 25px; 
-            border-radius: 16px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); text-align: center; position: relative;
+            border-radius: 16px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); text-align: center; 
+            position: relative; /* Important pour le positionnement du bouton */
+            padding-top: 50px; /* On laisse de la place en haut pour le bouton */
         }
 
-        /* --- NOUVELLE BARRE D'EN-TÊTE (Gestion du positionnement) --- */
-        .header-top {
-            display: flex;
-            justify-content: flex-end; /* PC : Aligné à droite */
-            width: 100%;
-            margin-bottom: 5px;
+        /* --- LE PETIT BOUTON EN HAUT À DROITE --- */
+        #langBtn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #26262c; 
+            border: 1px solid #3a3a40; 
+            color: #888;
+            padding: 5px 10px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 0.75rem; 
+            font-weight: 700; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+            z-index: 10;
         }
-
-        /* STYLE DU BOUTON LANGUE */
-        .lang-switch {
-            background: #26262c; border: 1px solid #3a3a40; color: #fff;
-            padding: 8px 12px; border-radius: 8px; cursor: pointer; 
-            font-size: 0.9rem; font-weight: 600; text-transform: uppercase;
-            transition: 0.2s;
-            /* Plus de position absolute ici ! */
+        #langBtn:hover { 
+            background: #3a3a40; 
+            color: white; 
+            border-color: var(--primary); 
+            transform: scale(1.05);
         }
-        .lang-switch:hover { background: #3a3a40; border-color: var(--primary); }
-        .lang-switch:focus { outline: none; border-color: var(--primary); }
 
         h1 { font-weight: 800; margin-bottom: 20px; color: #bf94ff; font-size: 1.5rem; margin-top: 0; }
 
@@ -100,13 +108,10 @@
         #status-msg { margin-bottom: 15px; font-weight: 500; min-height: 1.2em; font-size: 0.9rem; }
         .status-loading { color: #e6e619; } .status-success { color: #00ff88; } .status-error { color: #ff4f4d; }
 
-        /* --- MOBILE : CENTRAGE --- */
         @media (max-width: 600px) { 
-            .container { padding: 15px; width: 100%; border-radius: 0; box-shadow: none; } 
-            body { padding: 0; } .search-bar { flex-direction: column; } button { width: 100%; } 
-            
-            /* Mobile : On centre le bouton langue */
-            .header-top { justify-content: center; margin-bottom: 15px; }
+            .container { padding: 15px; padding-top: 45px; width: 100%; border-radius: 0; box-shadow: none; } 
+            body { padding: 0; } .search-bar { flex-direction: column; } button { width: 100%; }
+            #langBtn { width: auto; } /* Empêche le bouton de s'élargir sur mobile */
         }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
@@ -115,13 +120,7 @@
 
     <div class="container">
         
-        <div class="header-top">
-            <select class="lang-switch" onchange="setLanguage(this.value)">
-                <option value="fr">FR</option>
-                <option value="en">EN</option>
-                <option value="es">ES</option>
-            </select>
-        </div>
+        <button id="langBtn" onclick="cycleLanguage()" title="Changer de langue">FR</button>
 
         <h1 data-lang="title">Watch Twitch VODs Without Subscription</h1>
         
@@ -180,7 +179,10 @@
     </div>
 
     <script>
-        // --- DICTIONNAIRE DE LANGUES ---
+        // --- CONFIGURATION LANGUES ---
+        const langs = ['fr', 'en', 'es'];
+        let currentLang = 'fr';
+        
         const translations = {
             fr: {
                 title: "Regarder Twitch sans Sub",
@@ -290,15 +292,15 @@
             vlcSection: document.getElementById('vlc-section'),
             qualitySelect: document.getElementById('qualitySelect'),
             vlcInput: document.getElementById('vlcLink'),
-            liveArea: document.getElementById('live-area')
+            liveArea: document.getElementById('live-area'),
+            langBtn: document.getElementById('langBtn')
         };
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Détection automatique de la langue du navigateur
+            // Détection automatique
             const userLang = navigator.language.slice(0, 2);
             if (translations[userLang]) {
                 setLanguage(userLang);
-                document.querySelector('.lang-switch').value = userLang;
             } else {
                 setLanguage('fr');
             }
@@ -321,18 +323,27 @@
             }
         });
 
-        // --- FONCTION DE TRADUCTION ---
+        // --- CYCLE LANGUE (FR -> EN -> ES -> FR) ---
+        function cycleLanguage() {
+            let idx = langs.indexOf(currentLang);
+            idx = (idx + 1) % langs.length;
+            setLanguage(langs[idx]);
+        }
+
         function setLanguage(lang) {
             currentLang = lang;
             const t = translations[lang];
             
-            // 1. Traduire les textes simples (data-lang)
+            // Mise à jour du texte du petit bouton
+            elements.langBtn.textContent = lang.toUpperCase();
+
+            // Traductions Textes
             document.querySelectorAll('[data-lang]').forEach(el => {
                 const key = el.getAttribute('data-lang');
                 if (t[key]) el.textContent = t[key];
             });
 
-            // 2. Traduire les placeholders (champs de texte)
+            // Traductions Placeholders
             document.querySelectorAll('[data-placeholder]').forEach(el => {
                 const key = el.getAttribute('data-placeholder');
                 if (t[key]) el.placeholder = t[key];
@@ -345,7 +356,6 @@
         }
 
         function setStatus(msgKey, type, extra = "") {
-            // Si le message est une clé de traduction, on traduit. Sinon on affiche tel quel.
             const text = translations[currentLang][msgKey] ? translations[currentLang][msgKey] : msgKey;
             elements.status.textContent = text + extra;
             elements.status.className = type ? 'status-' + type : '';
