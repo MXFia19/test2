@@ -198,14 +198,21 @@
         const vodList = document.getElementById('vod-list');
 
         document.addEventListener('DOMContentLoaded', () => {
-            player = new Plyr(video, {
-                controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'fullscreen'],
-                settings: ['speed']
-            });
+        // Code existant pour Plyr...
+        player = new Plyr(video, { /* ... */ });
+    
+        // --- AJOUT : DÉTECTION AUTOMATIQUE DE L'ID DANS L'URL ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const idFromUrl = urlParams.get('id');
 
-            if (isMobile()) {
-                document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
-            }
+        if (idFromUrl) {
+        // On remplit le champ et on lance la recherche
+        document.getElementById('vodInput').value = idFromUrl;
+        switchTab('direct'); // On passe sur l'onglet "Direct"
+        searchVodById();     // On lance la vidéo !
+        }
+
+        if (isMobile()) { /* ... */ }
         });
 
         function isMobile() {
@@ -405,3 +412,4 @@
     </script>
 </body>
 </html>
+
