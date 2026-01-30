@@ -9,18 +9,9 @@ app.use(express.json());
 
 const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 
-// ORDRE DE TRI (Du meilleur au pire)
+// ORDRE DE TRI QUALITÉ
 const QUALITY_ORDER = [
-    'chunked',   // Source
-    'source',
-    '1080p60',
-    '1080p30',
-    '720p60',
-    '720p30',
-    '480p30',
-    '360p30',
-    '160p30',
-    'audio_only'
+    'chunked', 'source', '1080p60', '1080p30', '720p60', '720p30', '480p30', '360p30', '160p30', 'audio_only'
 ];
 
 const AXIOS_CONFIG = {
@@ -33,7 +24,8 @@ const AXIOS_CONFIG = {
     validateStatus: status => status >= 200 && status < 500
 };
 
-// --- FONCTIONS ---
+// --- FONCTIONS UTILITAIRES ---
+
 async function getChannelVideos(login) {
     const data = {
         query: `query {
@@ -41,23 +33,17 @@ async function getChannelVideos(login) {
                 videos(first: 20, type: ARCHIVE, sort: TIME) {
                     edges {
                         node {
-                            id
-                            title
-                            publishedAt
-                            lengthSeconds
+                            id, title, publishedAt, lengthSeconds, viewCount,
                             previewThumbnailURL(height: 180, width: 320)
-                            viewCount
                         }
                     }
                 }
             }
         }`
     };
-
     try {
         const response = await axios.post('https://gql.twitch.tv/gql', data, { headers: { 'Client-ID': CLIENT_ID } });
-        if (!response.data.data.user) return null;
-        return response.data.data.user.videos.edges.map(edge => edge.node);
+        return response.data.data.user?.videos.edges.map(edge => edge.node) || null;
     } catch (e) { return null; }
 }
 
@@ -73,10 +59,40 @@ async function getAccessToken(vodId) {
     } catch (e) { return null; }
 }
 
-async function getVodStoryboardData(vodId) {
+async function getLiveAccessToken(login) {
+    const cleanLogin = login.toLowerCase();
     const data = {
-        query: `query { video(id: "${vodId}") { seekPreviewsURL, owner { login } } }`
+        operationName: "PlaybackAccessToken_Template",
+        query: "query PlaybackAccessToken_Template($login: String!, $isLive: Boolean!, $playerType: String!) { streamPlaybackAccessToken(channelName: $login, params: {platform: \"web\", playerBackend: \"mediaplayer\", playerType: $playerType}) @include(if: $isLive) { value signature __typename } }",
+        variables: { isLive: true, login: cleanLogin, playerType: "site" }
     };
+    try {
+        const response = await axios.post('https://gql.twitch.tv/gql', data, { 
+            headers: { 
+                'Client-ID': CLIENT_ID,
+                'User-Agent': AXIOS_CONFIG.headers['User-Agent'],
+                'Referer': 'https://www.twitch.tv/',
+                'Origin': 'https://www.twitch.tv',
+                'Device-ID': 'MkMq8a9' + Math.random().toString(36).substring(2, 15)
+            } 
+        });
+        if (response.data.errors) return null;
+        return response.data.data.streamPlaybackAccessToken;
+    } catch (e) { return null; }
+}
+
+async function getStreamMetadata(login) {
+    const data = {
+        query: `query { user(login: "${login}") { broadcastSettings { title, game { displayName } } } }`
+    };
+    try {
+        const response = await axios.post('https://gql.twitch.tv/gql', data, { headers: { 'Client-ID': CLIENT_ID } });
+        return response.data.data?.user?.broadcastSettings;
+    } catch (e) { return null; }
+}
+
+async function getVodStoryboardData(vodId) {
+    const data = { query: `query { video(id: "${vodId}") { seekPreviewsURL, owner { login } } }` };
     try {
         const response = await axios.post('https://gql.twitch.tv/gql', data, { headers: { 'Client-ID': CLIENT_ID } });
         return response.data.data.video;
@@ -92,325 +108,151 @@ async function checkLink(url) {
 
 async function storyboardHack(seekPreviewsURL) {
     if (!seekPreviewsURL) return null;
-
     try {
         const urlObj = new URL(seekPreviewsURL);
         const domain = urlObj.host;
         const paths = urlObj.pathname.split("/");
-        
         const storyboardIndex = paths.findIndex(element => element.includes("storyboards"));
         if (storyboardIndex === -1) return null;
-        
         const vodSpecialID = paths[storyboardIndex - 1];
         
         let unsortedLinks = {};
-        console.log(`⚡ Scan des qualités sur ${domain}...`);
-
-        const promises = QUALITY_ORDER.map(async (q) => {
+        await Promise.all(QUALITY_ORDER.map(async (q) => {
             const url = `https://${domain}/${vodSpecialID}/${q}/index-dvr.m3u8`;
-            if (await checkLink(url)) {
-                unsortedLinks[q] = url;
-            }
-        });
-
-        await Promise.all(promises);
+            if (await checkLink(url)) unsortedLinks[q] = url;
+        }));
 
         let sortedLinks = {};
         for (const quality of QUALITY_ORDER) {
-            if (unsortedLinks[quality]) {
-                sortedLinks[quality] = unsortedLinks[quality];
-            }
+            if (unsortedLinks[quality]) sortedLinks[quality] = unsortedLinks[quality];
         }
-        if (Object.keys(sortedLinks).length > 0) return sortedLinks;
-
-    } catch (e) { console.log("Erreur:", e.message); }
-    return null;
+        return Object.keys(sortedLinks).length > 0 ? sortedLinks : null;
+    } catch (e) { return null; }
 }
 
-// Servir les fichiers statiques (CSS/JS/HTML)
-app.use(express.static(path.join(__dirname, 'public')));
+// --- ROUTES ---
 
-// --- PROXY CORS INTELLIGENT (Gère les m3u8 et les .ts) ---
+// 1. PROXY INTELLIGENT
 app.get('/api/proxy', async (req, res) => {
     const targetUrl = req.query.url;
     if (!targetUrl) return res.status(400).send('URL manquante');
 
-    // Headers pour se faire passer pour Twitch
-    const twitchHeaders = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Referer': 'https://www.twitch.tv/',
-        'Origin': 'https://www.twitch.tv'
-    };
-
     try {
-        // CAS 1 : C'est un fichier Playlist (.m3u8)
-        // On doit le télécharger en TEXTE, modifier les liens dedans, puis l'envoyer.
         if (targetUrl.includes('.m3u8')) {
-            const response = await axios.get(targetUrl, { 
-                headers: twitchHeaders,
-                responseType: 'text' // Important : on veut manipuler le texte
-            });
-
-            // On trouve le dossier de base de la vidéo sur Twitch (ex: https://.../chunked/)
+            const response = await axios.get(targetUrl, { headers: AXIOS_CONFIG.headers, responseType: 'text' });
             const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
             
-            // On parcourt le fichier ligne par ligne
             const newContent = response.data.split('\n').map(line => {
                 const l = line.trim();
-                // Si la ligne est vide ou commence par # (info technique), on la garde telle quelle
                 if (!l || l.startsWith('#')) return l; 
-                
-                // Sinon, c'est un lien vers un segment vidéo (.ts) !
-                // On reconstruit le lien complet vers Twitch
                 const fullLink = l.startsWith('http') ? l : baseUrl + l;
-                
-                // ET ON L'ENROBE DANS NOTRE PROXY pour que le lecteur repasse par nous
                 return `/api/proxy?url=${encodeURIComponent(fullLink)}`;
             }).join('\n');
 
-            // On envoie le fichier modifié
             res.set('Access-Control-Allow-Origin', '*');
             res.set('Content-Type', 'application/vnd.apple.mpegurl');
             return res.send(newContent);
         }
 
-        // CAS 2 : C'est un segment vidéo (.ts) ou autre
-        // On fait juste "passe-plat" (Stream) sans rien toucher
         const response = await axios({
-            url: targetUrl,
-            method: 'GET',
-            responseType: 'stream',
-            headers: twitchHeaders
+            url: targetUrl, method: 'GET', responseType: 'stream', headers: AXIOS_CONFIG.headers
         });
-
         res.set('Access-Control-Allow-Origin', '*');
         res.set('Content-Type', response.headers['content-type']);
         response.data.pipe(res);
 
     } catch (e) {
-        console.error("Erreur Proxy:", e.message);
-        if (!res.headersSent) res.status(500).send('Erreur lors du proxy');
+        if (!res.headersSent) res.status(500).send('Erreur proxy');
     }
 });
 
-// --- FONCTION CORRIGÉE (Query nettoyée) ---
-async function getLiveAccessToken(login) {
-    // 1. Force le pseudo en minuscules (Toujours important)
-    const cleanLogin = login.toLowerCase();
+// 2. RECHERCHE VODS CHAÎNE
+app.get('/api/get-channel-videos', async (req, res) => {
+    const channelName = req.query.name;
+    if (!channelName) return res.status(400).json({ error: 'Nom manquant' });
+    
+    console.log(`\n🔎 Recherche chaîne : ${channelName}`);
+    const videos = await getChannelVideos(channelName);
+    return videos ? res.json({ videos }) : res.status(404).json({ error: "Chaîne introuvable ou aucune VOD." });
+});
 
-    const data = {
-        operationName: "PlaybackAccessToken_Template",
-        // CORRECTION ICI : J'ai retiré $vodID et $isVod qui causaient l'erreur
-        query: "query PlaybackAccessToken_Template($login: String!, $isLive: Boolean!, $playerType: String!) { streamPlaybackAccessToken(channelName: $login, params: {platform: \"web\", playerBackend: \"mediaplayer\", playerType: $playerType}) @include(if: $isLive) { value signature __typename } }",
-        variables: { 
-            isLive: true, 
-            login: cleanLogin, 
-            playerType: "site" 
-        }
-    };
-
-    try {
-        const response = await axios.post('https://gql.twitch.tv/gql', data, { 
-            headers: { 
-                'Client-ID': CLIENT_ID,
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Referer': 'https://www.twitch.tv/',
-                'Origin': 'https://www.twitch.tv',
-                'Device-ID': 'MkMq8a9' + Math.random().toString(36).substring(2, 15)
-            } 
-        });
-
-        if (response.data.errors) {
-            console.log(`[Erreur GQL] ${JSON.stringify(response.data.errors)}`);
-            return null;
-        }
-
-        return response.data.data.streamPlaybackAccessToken;
-    } catch (e) { 
-        console.log("Erreur Token Live:", e.message);
-        return null; 
-    }
-}
-
-// --- FONCTION MANQUANTE : RÉCUPÉRER TITRE & JEU ---
-async function getStreamMetadata(login) {
-    const data = {
-        query: `query {
-            user(login: "${login}") {
-                broadcastSettings {
-                    title
-                    game { displayName }
-                }
-            }
-        }`
-    };
-    try {
-        const response = await axios.post('https://gql.twitch.tv/gql', data, {
-            headers: { 'Client-ID': CLIENT_ID }
-        });
-        return response.data.data?.user?.broadcastSettings;
-    } catch (e) { return null; }
-}
-
-
-
-// --- ROUTE API POUR LE LIVE (Strict Mode : Offline = Erreur) ---
+// 3. RECUPERATION LIVE
 app.get('/api/get-live', async (req, res) => {
     const channelName = req.query.name;
-    if (!channelName) return res.status(400).json({ error: 'Nom de chaîne manquant' });
+    if (!channelName) return res.status(400).json({ error: 'Nom manquant' });
     
     const cleanName = channelName.trim().toLowerCase();
     console.log(`\n🔴 Recherche LIVE : ${cleanName}`);
 
-    // 1. Récupération Token
     const tokenData = await getLiveAccessToken(cleanName);
-    
-    // Si pas de token, c'est sûr qu'il est offline
-    if (!tokenData) {
-        return res.status(404).json({ error: "Streamer hors-ligne ou introuvable." });
-    }
+    if (!tokenData) return res.status(404).json({ error: "Offline" });
 
-    // 2. Récupération Titre & Jeu
     const metadata = await getStreamMetadata(cleanName);
-    const streamTitle = metadata?.title || "Live Stream";
-    const streamGame = metadata?.game?.displayName || "";
-
-    // 3. Construction URL
-    const masterUrl = `https://usher.ttvnw.net/api/channel/hls/${cleanName}.m3u8` +
-        `?allow_source=true&allow_audio_only=true&allow_spectre=true` +
-        `&player=twitchweb&playlist_include_framerate=true&segment_preference=4` +
-        `&sig=${encodeURIComponent(tokenData.signature)}` +
-        `&token=${encodeURIComponent(tokenData.value)}`;
+    const masterUrl = `https://usher.ttvnw.net/api/channel/hls/${cleanName}.m3u8?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&playlist_include_framerate=true&segment_preference=4&sig=${encodeURIComponent(tokenData.signature)}&token=${encodeURIComponent(tokenData.value)}`;
 
     try {
-        // 4. VERIFICATION ULTIME : On essaie de télécharger le fichier
-        const response = await axios.get(masterUrl, {
-            headers: { 
-                'Client-ID': CLIENT_ID, 
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            }
-        });
-
-        // SI ON ARRIVE ICI, C'EST QUE LE STREAM EST VRAIMENT EN LIGNE (200 OK)
-
-        const lines = response.data.split('\n');
-        let links = { "Auto (Multi-qualités)": masterUrl };
+        const response = await axios.get(masterUrl, { headers: AXIOS_CONFIG.headers });
+        const links = parseM3U8(response.data, masterUrl);
         
-        let lastInfo = "";
-        
-        lines.forEach(line => {
-            if (line.startsWith('#EXT-X-STREAM-INF')) {
-                const resMatch = line.match(/RESOLUTION=(\d+x\d+)/);
-                const nameMatch = line.match(/VIDEO="([^"]+)"/);
-                
-                let qualityName = "Inconnue";
-                if (nameMatch) qualityName = nameMatch[1];
-                if (resMatch) qualityName += ` (${resMatch[1]})`;
-                if (qualityName.includes('chunked')) qualityName = "Source (Best)";
-                
-                lastInfo = qualityName;
-            } else if (line.startsWith('http')) {
-                if (lastInfo) {
-                    links[lastInfo] = line;
-                    lastInfo = "";
-                }
-            }
-        });
-
         return res.json({ 
-            links: links, 
-            best: masterUrl, 
-            title: streamTitle, 
-            game: streamGame 
+            links: links, best: masterUrl, 
+            title: metadata?.title || "Live", game: metadata?.game?.displayName || "" 
         });
-
     } catch (e) {
-        // C'EST ICI QUE ÇA CHANGE :
-        // Si le lien renvoie une erreur (404), c'est que le streamer est OFFLINE.
-        // On ne renvoie plus de lien "au cas où", on renvoie une erreur au site.
-        console.log(`Stream Offline détecté pour ${cleanName} (404 ou erreur réseau)`);
-        return res.status(404).json({ error: "Le streamer est actuellement HORS-LIGNE." });
+        return res.status(404).json({ error: "Le streamer est hors-ligne." });
     }
 });
 
-// --- ROUTES ---
-app.get('/api/get-channel-videos', async (req, res) => {
-    const channelName = req.query.name;
-    if (!channelName) return res.status(400).json({ error: 'Nom de chaîne manquant' });
-    console.log(`\n🔎 Recherche chaîne : ${channelName}`);
-    const videos = await getChannelVideos(channelName);
-    if (videos) {
-        return res.json({ videos: videos });
-    } else {
-        return res.status(404).json({ error: "Chaîne introuvable ou aucune VOD." });
-    }
-});
-
-// --- ROUTE VOD CORRIGÉE (Multi-qualités) ---
+// 4. RECUPERATION VOD (Avec multi-qualités)
 app.get('/api/get-m3u8', async (req, res) => {
     const vodId = req.query.id;
     if (!vodId) return res.status(400).send('ID manquant');
     console.log(`\n🔎 Analyse VOD : ${vodId}`);
 
-    // 1. On tente la méthode officielle (Token Twitch)
     const tokenData = await getAccessToken(vodId);
     if (tokenData) {
         const masterUrl = `https://usher.ttvnw.net/vod/${vodId}.m3u8?nauth=${tokenData.value}&nauthsig=${tokenData.signature}&allow_source=true&player_backend=mediaplayer`;
         try {
-            // On télécharge la playlist pour voir les qualités
             const response = await axios.get(masterUrl, AXIOS_CONFIG);
-            
-            if (response.data && typeof response.data === 'string' && response.data.includes('#EXTM3U')) {
-                // ON ANALYSE LE FICHIER (Même logique que le Live)
-                const lines = response.data.split('\n');
-                let links = { "Auto (Officiel)": masterUrl };
-                let lastInfo = "";
-
-                lines.forEach(line => {
-                    if (line.startsWith('#EXT-X-STREAM-INF')) {
-                        const resMatch = line.match(/RESOLUTION=(\d+x\d+)/);
-                        const nameMatch = line.match(/VIDEO="([^"]+)"/);
-                        
-                        let qualityName = "Inconnue";
-                        if (nameMatch) qualityName = nameMatch[1];
-                        if (resMatch) qualityName += ` (${resMatch[1]})`;
-                        if (qualityName.includes('chunked')) qualityName = "Source (Best)";
-                        
-                        lastInfo = qualityName;
-                    } else if (line.startsWith('http')) {
-                        if (lastInfo) {
-                            links[lastInfo] = line;
-                            lastInfo = "";
-                        }
-                    }
-                });
-
+            if (response.data && response.data.includes('#EXTM3U')) {
+                const links = parseM3U8(response.data, masterUrl);
                 return res.json({ links: links, best: masterUrl });
             }
-        } catch (e) {
-            console.log("Erreur méthode officielle:", e.message);
-        }
+        } catch (e) {}
     }
 
-    // 2. Fallback : Méthode "Storyboard" (si pas de sub/token)
     const metadata = await getVodStoryboardData(vodId);
     if (metadata && metadata.seekPreviewsURL) {
         const links = await storyboardHack(metadata.seekPreviewsURL);
         if (links) {
-            const best = Object.values(links)[0];
-            return res.json({ links: links, best: best, info: `VOD de ${metadata.owner.login} (Mode Backup)` });
+            return res.json({ links: links, best: Object.values(links)[0], info: `VOD de ${metadata.owner.login} (Mode Backup)` });
         }
     }
-
     res.status(404).json({ error: "VOD introuvable." });
 });
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
+// Fonction d'aide pour lire les M3U8
+function parseM3U8(content, masterUrl) {
+    const lines = content.split('\n');
+    let links = { "Auto": masterUrl };
+    let lastInfo = "";
+    lines.forEach(line => {
+        if (line.startsWith('#EXT-X-STREAM-INF')) {
+            const resMatch = line.match(/RESOLUTION=(\d+x\d+)/);
+            const nameMatch = line.match(/VIDEO="([^"]+)"/);
+            let qualityName = nameMatch ? nameMatch[1] : "Inconnue";
+            if (resMatch) qualityName += ` (${resMatch[1]})`;
+            if (qualityName.includes('chunked')) qualityName = "Source (Best)";
+            lastInfo = qualityName;
+        } else if (line.startsWith('http')) {
+            if (lastInfo) { links[lastInfo] = line; lastInfo = ""; }
+        }
+    });
+    return links;
+}
 
-// --- PORT CONFIG POUR RENDER ---
+app.use(express.static(path.join(__dirname, 'public')));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`🚀 Serveur prêt sur le port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Serveur prêt sur le port ${PORT}`));
