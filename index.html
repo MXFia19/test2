@@ -25,19 +25,16 @@
             border-radius: 16px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); text-align: center; position: relative;
         }
 
-        /* --- NOUVEAU : BOUTONS DE LANGUE --- */
-        .lang-container {
+        /* --- SÉLECTEUR DE LANGUE (TEXTE SIMPLE) --- */
+        .lang-switch {
             position: absolute; top: 20px; right: 20px;
-            display: flex; gap: 5px;
-            background: #26262c; padding: 5px; border-radius: 10px; border: 1px solid #3a3a40;
+            background: #26262c; border: 1px solid #3a3a40; color: #fff;
+            padding: 8px 12px; border-radius: 8px; cursor: pointer; 
+            font-size: 0.9rem; font-weight: 600; text-transform: uppercase;
+            transition: 0.2s;
         }
-        .lang-btn {
-            background: transparent; border: none; font-size: 1.5rem; 
-            padding: 2px 5px; cursor: pointer; transition: transform 0.2s;
-            line-height: 1; filter: grayscale(0.5); opacity: 0.7;
-        }
-        .lang-btn:hover { transform: scale(1.15); filter: grayscale(0); opacity: 1; }
-        .lang-btn.active { filter: grayscale(0); opacity: 1; transform: scale(1.1); }
+        .lang-switch:hover { background: #3a3a40; border-color: var(--primary); }
+        .lang-switch:focus { outline: none; border-color: var(--primary); }
 
         h1 { font-weight: 800; margin-bottom: 20px; color: #bf94ff; font-size: 1.5rem; margin-top: 10px; }
 
@@ -95,10 +92,19 @@
         #status-msg { margin-bottom: 15px; font-weight: 500; min-height: 1.2em; font-size: 0.9rem; }
         .status-loading { color: #e6e619; } .status-success { color: #00ff88; } .status-error { color: #ff4f4d; }
 
+        /* --- MODE MOBILE (CORRECTION CHEVAUCHEMENT) --- */
         @media (max-width: 600px) { 
             .container { padding: 15px; width: 100%; border-radius: 0; box-shadow: none; } 
             body { padding: 0; } .search-bar { flex-direction: column; } button { width: 100%; } 
-            .lang-container { top: 10px; right: 10px; }
+            
+            /* On remet le bouton dans le flux normal (pas absolute) */
+            .lang-switch { 
+                position: static; 
+                display: block; 
+                margin: 0 auto 15px auto; /* Centré au-dessus du titre */
+                width: auto;
+                max-width: 150px;
+            }
         }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
@@ -106,11 +112,11 @@
 <body>
 
     <div class="container">
-        <div class="lang-container">
-            <button class="lang-btn" onclick="setLanguage('fr')" id="btn-fr" title="Français">🇫🇷</button>
-            <button class="lang-btn" onclick="setLanguage('en')" id="btn-en" title="English">🇺🇸</button>
-            <button class="lang-btn" onclick="setLanguage('es')" id="btn-es" title="Español">🇪🇸</button>
-        </div>
+        <select class="lang-switch" onchange="setLanguage(this.value)">
+            <option value="fr">FR</option>
+            <option value="en">EN</option>
+            <option value="es">ES</option>
+        </select>
 
         <h1 data-lang="title">Watch Twitch VODs Without Subscription</h1>
         
@@ -283,10 +289,11 @@
         };
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Détection automatique de la langue
+            // Détection automatique de la langue du navigateur
             const userLang = navigator.language.slice(0, 2);
             if (translations[userLang]) {
                 setLanguage(userLang);
+                document.querySelector('.lang-switch').value = userLang;
             } else {
                 setLanguage('fr');
             }
@@ -314,11 +321,6 @@
             currentLang = lang;
             const t = translations[lang];
             
-            // Mise à jour visuelle des boutons
-            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
-            const activeBtn = document.getElementById(`btn-${lang}`);
-            if(activeBtn) activeBtn.classList.add('active');
-
             // 1. Traduire les textes simples (data-lang)
             document.querySelectorAll('[data-lang]').forEach(el => {
                 const key = el.getAttribute('data-lang');
@@ -338,6 +340,7 @@
         }
 
         function setStatus(msgKey, type, extra = "") {
+            // Si le message est une clé de traduction, on traduit. Sinon on affiche tel quel.
             const text = translations[currentLang][msgKey] ? translations[currentLang][msgKey] : msgKey;
             elements.status.textContent = text + extra;
             elements.status.className = type ? 'status-' + type : '';
