@@ -346,28 +346,59 @@ app.get('/api/get-channel-videos', async (req, res) => {
     }
 });
 
+// --- ROUTE VOD CORRIGÉE (Multi-qualités) ---
 app.get('/api/get-m3u8', async (req, res) => {
     const vodId = req.query.id;
     if (!vodId) return res.status(400).send('ID manquant');
     console.log(`\n🔎 Analyse VOD : ${vodId}`);
 
+    // 1. On tente la méthode officielle (Token Twitch)
     const tokenData = await getAccessToken(vodId);
     if (tokenData) {
-        const url = `https://usher.ttvnw.net/vod/${vodId}.m3u8?nauth=${tokenData.value}&nauthsig=${tokenData.signature}&allow_source=true&player_backend=mediaplayer`;
+        const masterUrl = `https://usher.ttvnw.net/vod/${vodId}.m3u8?nauth=${tokenData.value}&nauthsig=${tokenData.signature}&allow_source=true&player_backend=mediaplayer`;
         try {
-            const check = await axios.get(url, AXIOS_CONFIG);
-            if (check.data && typeof check.data === 'string' && check.data.includes('#EXTM3U')) {
-                return res.json({ links: { "Auto (Officiel)": url }, best: url });
+            // On télécharge la playlist pour voir les qualités
+            const response = await axios.get(masterUrl, AXIOS_CONFIG);
+            
+            if (response.data && typeof response.data === 'string' && response.data.includes('#EXTM3U')) {
+                // ON ANALYSE LE FICHIER (Même logique que le Live)
+                const lines = response.data.split('\n');
+                let links = { "Auto (Officiel)": masterUrl };
+                let lastInfo = "";
+
+                lines.forEach(line => {
+                    if (line.startsWith('#EXT-X-STREAM-INF')) {
+                        const resMatch = line.match(/RESOLUTION=(\d+x\d+)/);
+                        const nameMatch = line.match(/VIDEO="([^"]+)"/);
+                        
+                        let qualityName = "Inconnue";
+                        if (nameMatch) qualityName = nameMatch[1];
+                        if (resMatch) qualityName += ` (${resMatch[1]})`;
+                        if (qualityName.includes('chunked')) qualityName = "Source (Best)";
+                        
+                        lastInfo = qualityName;
+                    } else if (line.startsWith('http')) {
+                        if (lastInfo) {
+                            links[lastInfo] = line;
+                            lastInfo = "";
+                        }
+                    }
+                });
+
+                return res.json({ links: links, best: masterUrl });
             }
-        } catch (e) {}
+        } catch (e) {
+            console.log("Erreur méthode officielle:", e.message);
+        }
     }
 
+    // 2. Fallback : Méthode "Storyboard" (si pas de sub/token)
     const metadata = await getVodStoryboardData(vodId);
     if (metadata && metadata.seekPreviewsURL) {
         const links = await storyboardHack(metadata.seekPreviewsURL);
         if (links) {
             const best = Object.values(links)[0];
-            return res.json({ links: links, best: best, info: `VOD de ${metadata.owner.login}` });
+            return res.json({ links: links, best: best, info: `VOD de ${metadata.owner.login} (Mode Backup)` });
         }
     }
 
@@ -383,13 +414,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Serveur prêt sur le port ${PORT}`);
 });
-
-
-
-
-
-
-
-
-
-
