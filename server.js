@@ -192,6 +192,41 @@ app.get('/api/proxy', async (req, res) => {
         if (!res.headersSent) res.status(500).send('Erreur lors du proxy');
     }
 });
+
+// --- AJOUT : FONCTION POUR LE LIVE ---
+async function getLiveAccessToken(login) {
+    const data = {
+        operationName: "PlaybackAccessToken_Template",
+        query: "query PlaybackAccessToken_Template($login: String!, $isLive: Boolean!, $vodID: ID!, $isVod: Boolean!, $playerType: String!) { streamPlaybackAccessToken(channelName: $login, params: {platform: \"web\", playerBackend: \"mediaplayer\", playerType: $playerType}) @include(if: $isLive) { value signature __typename } }",
+        variables: { isLive: true, login: login, isVod: false, vodID: "", playerType: "site" }
+    };
+    try {
+        const response = await axios.post('https://gql.twitch.tv/gql', data, { headers: { 'Client-ID': CLIENT_ID } });
+        return response.data.data.streamPlaybackAccessToken;
+    } catch (e) { return null; }
+}
+// --- AJOUT : ROUTE API POUR LE LIVE ---
+app.get('/api/get-live', async (req, res) => {
+    const channelName = req.query.name;
+    if (!channelName) return res.status(400).json({ error: 'Nom de chaîne manquant' });
+    
+    console.log(`\n🔴 Recherche LIVE : ${channelName}`);
+
+    const tokenData = await getLiveAccessToken(channelName);
+    if (!tokenData) {
+        return res.status(404).json({ error: "Live introuvable ou chaîne hors ligne." });
+    }
+
+    // Construction du lien m3u8 officiel pour le live
+    const url = `https://usher.ttvnw.net/api/channel/hls/${channelName}.m3u8?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&playlist_include_framerate=true&segment_preference=4&sig=${tokenData.signature}&token=${tokenData.value}`;
+
+    // On renvoie le lien. Le frontend devra le passer dans le PROXY.
+    return res.json({ 
+        links: { "Auto (Live)": url }, 
+        best: url 
+    });
+});
+
 // --- ROUTES ---
 app.get('/api/get-channel-videos', async (req, res) => {
     const channelName = req.query.name;
@@ -242,5 +277,6 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Serveur prêt sur le port ${PORT}`);
 });
+
 
 
