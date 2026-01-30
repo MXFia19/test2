@@ -23,12 +23,12 @@
         .container { 
             width: 100%; max-width: 900px; background: var(--card); padding: 25px; 
             border-radius: 16px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); text-align: center; 
-            position: relative; /* Important pour le positionnement du bouton */
-            padding-top: 50px; /* On laisse de la place en haut pour le bouton */
+            position: relative; /* Important pour le positionnement */
+            padding-top: 50px; /* Espace pour le bouton en haut */
         }
 
-        /* --- LE PETIT BOUTON EN HAUT À DROITE --- */
-        #langBtn {
+        /* --- LE PETIT MENU DÉGUISÉ EN BOUTON --- */
+        #langSelect {
             position: absolute;
             top: 15px;
             right: 15px;
@@ -44,13 +44,21 @@
             letter-spacing: 1px;
             transition: all 0.2s;
             z-index: 10;
+            
+            /* ASTUCE : On cache la flèche par défaut pour que ça ressemble à un bouton */
+            appearance: none; 
+            -webkit-appearance: none; 
+            -moz-appearance: none;
+            text-align: center;
+            width: auto;
         }
-        #langBtn:hover { 
+        #langSelect:hover { 
             background: #3a3a40; 
             color: white; 
             border-color: var(--primary); 
             transform: scale(1.05);
         }
+        #langSelect:focus { outline: none; border-color: var(--primary); }
 
         h1 { font-weight: 800; margin-bottom: 20px; color: #bf94ff; font-size: 1.5rem; margin-top: 0; }
 
@@ -111,7 +119,6 @@
         @media (max-width: 600px) { 
             .container { padding: 15px; padding-top: 45px; width: 100%; border-radius: 0; box-shadow: none; } 
             body { padding: 0; } .search-bar { flex-direction: column; } button { width: 100%; }
-            #langBtn { width: auto; } /* Empêche le bouton de s'élargir sur mobile */
         }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
@@ -120,7 +127,11 @@
 
     <div class="container">
         
-        <button id="langBtn" onclick="cycleLanguage()" title="Changer de langue">FR</button>
+        <select id="langSelect" onchange="setLanguage(this.value)" title="Language">
+            <option value="fr">FR</option>
+            <option value="en">EN</option>
+            <option value="es">ES</option>
+        </select>
 
         <h1 data-lang="title">Watch Twitch VODs Without Subscription</h1>
         
@@ -179,10 +190,7 @@
     </div>
 
     <script>
-        // --- CONFIGURATION LANGUES ---
-        const langs = ['fr', 'en', 'es'];
-        let currentLang = 'fr';
-        
+        // --- DICTIONNAIRE DE LANGUES ---
         const translations = {
             fr: {
                 title: "Regarder Twitch sans Sub",
@@ -293,11 +301,11 @@
             qualitySelect: document.getElementById('qualitySelect'),
             vlcInput: document.getElementById('vlcLink'),
             liveArea: document.getElementById('live-area'),
-            langBtn: document.getElementById('langBtn')
+            langSelect: document.getElementById('langSelect')
         };
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Détection automatique
+            // Détection automatique de la langue
             const userLang = navigator.language.slice(0, 2);
             if (translations[userLang]) {
                 setLanguage(userLang);
@@ -323,27 +331,21 @@
             }
         });
 
-        // --- CYCLE LANGUE (FR -> EN -> ES -> FR) ---
-        function cycleLanguage() {
-            let idx = langs.indexOf(currentLang);
-            idx = (idx + 1) % langs.length;
-            setLanguage(langs[idx]);
-        }
-
+        // --- FONCTION DE TRADUCTION ---
         function setLanguage(lang) {
             currentLang = lang;
             const t = translations[lang];
             
-            // Mise à jour du texte du petit bouton
-            elements.langBtn.textContent = lang.toUpperCase();
+            // On met à jour la valeur du select si changé programmatiquement
+            if (elements.langSelect) elements.langSelect.value = lang;
 
-            // Traductions Textes
+            // 1. Traduire les textes simples (data-lang)
             document.querySelectorAll('[data-lang]').forEach(el => {
                 const key = el.getAttribute('data-lang');
                 if (t[key]) el.textContent = t[key];
             });
 
-            // Traductions Placeholders
+            // 2. Traduire les placeholders (champs de texte)
             document.querySelectorAll('[data-placeholder]').forEach(el => {
                 const key = el.getAttribute('data-placeholder');
                 if (t[key]) el.placeholder = t[key];
@@ -356,6 +358,7 @@
         }
 
         function setStatus(msgKey, type, extra = "") {
+            // Si le message est une clé de traduction, on traduit. Sinon on affiche tel quel.
             const text = translations[currentLang][msgKey] ? translations[currentLang][msgKey] : msgKey;
             elements.status.textContent = text + extra;
             elements.status.className = type ? 'status-' + type : '';
