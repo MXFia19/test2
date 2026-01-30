@@ -431,9 +431,35 @@
             videoContainer.style.display = 'block';
             vlcSection.style.display = 'flex';
         }
+
+        // --- COLLE LA FONCTION ICI, JUSTE AVANT LA FIN ---
+
+        // --- FONCTION PIP UNIVERSELLE (Compatible iOS & PC) ---
+        function togglePiP() {
+            const video = document.getElementById('player');
+            
+            // 1. Méthode Standard (Chrome, Edge, Firefox)
+            if (document.pictureInPictureEnabled) {
+                if (document.pictureInPictureElement) {
+                    document.exitPictureInPicture();
+                } else {
+                    video.requestPictureInPicture();
+                }
+            } 
+            // 2. Méthode Apple iOS (iPhone/iPad)
+            else if (video.webkitSupportsPresentationMode && typeof video.webkitSetPresentationMode === "function") {
+                const mode = video.webkitPresentationMode === "picture-in-picture" ? "inline" : "picture-in-picture";
+                video.webkitSetPresentationMode(mode);
+            } 
+            else {
+                alert("Le mode PiP n'est pas supporté par ce navigateur.");
+            }
+        }
+
     </script>
 </body>
 </html>
+
 
 
 
