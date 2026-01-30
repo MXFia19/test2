@@ -225,7 +225,10 @@
         searchVodById();     // On lance la vidéo !
         }
 
-        if (isMobile()) { /* ... */ }
+        if (isMobile()) {
+            // Cette ligne rend visible tous les éléments avec la classe "mobile-only"
+            document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
+        }
         });
 
         function isMobile() {
@@ -459,6 +462,7 @@
     </script>
 </body>
 </html>
+
 
 
 
