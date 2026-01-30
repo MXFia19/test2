@@ -194,6 +194,7 @@ app.get('/api/proxy', async (req, res) => {
 });
 
 // --- AJOUT : FONCTION POUR LE LIVE ---
+
 async function getLiveAccessToken(login) {
     const data = {
         operationName: "PlaybackAccessToken_Template",
@@ -201,9 +202,20 @@ async function getLiveAccessToken(login) {
         variables: { isLive: true, login: login, isVod: false, vodID: "", playerType: "site" }
     };
     try {
-        const response = await axios.post('https://gql.twitch.tv/gql', data, { headers: { 'Client-ID': CLIENT_ID } });
+        const response = await axios.post('https://gql.twitch.tv/gql', data, { 
+            headers: { 
+                'Client-ID': CLIENT_ID,
+                // Ces 3 lignes sont INDISPENSABLES pour le Live :
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Referer': 'https://www.twitch.tv/',
+                'Origin': 'https://www.twitch.tv'
+            } 
+        });
         return response.data.data.streamPlaybackAccessToken;
-    } catch (e) { return null; }
+    } catch (e) { 
+        console.log("Erreur Token Live:", e.message);
+        return null; 
+    }
 }
 // --- AJOUT : ROUTE API POUR LE LIVE ---
 app.get('/api/get-live', async (req, res) => {
@@ -277,6 +289,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Serveur prêt sur le port ${PORT}`);
 });
+
 
 
 
