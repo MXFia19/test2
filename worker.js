@@ -1,10 +1,10 @@
-// worker.js - VERSION V9 (Miniature Manuelle + Titre Restauré + Proxy VOD)
+// worker.js - VERSION V10 (Optimisation Cache + Performance)
 const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 
 const COMMON_HEADERS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Cache-Control', // Ajout Cache-Control
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
     'Referer': 'https://www.twitch.tv/',
     'Origin': 'https://www.twitch.tv'
@@ -20,13 +20,14 @@ export default {
         const workerOrigin = url.origin; 
         
         try {
-            if (url.pathname === '/') return new Response("Twitch Proxy V9 Ready", { headers: COMMON_HEADERS });
-            if (url.pathname === '/api/get-live') return await handleGetLive(url, workerOrigin);
-            if (url.pathname === '/api/get-channel-videos') return await handleGetVideos(url);
-            if (url.pathname === '/api/get-m3u8') return await handleGetM3U8(url, workerOrigin);
-            if (url.pathname === '/api/proxy') return await handleProxy(url);
-
-            return new Response("Not Found", { status: 404, headers: COMMON_HEADERS });
+            switch (url.pathname) {
+                case '/': return new Response("Twitch Proxy V10 Optimized", { headers: COMMON_HEADERS });
+                case '/api/get-live': return await handleGetLive(url, workerOrigin);
+                case '/api/get-channel-videos': return await handleGetVideos(url);
+                case '/api/get-m3u8': return await handleGetM3U8(url, workerOrigin);
+                case '/api/proxy': return await handleProxy(url);
+                default: return new Response("Not Found", { status: 404, headers: COMMON_HEADERS });
+            }
         } catch (e) {
             return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...COMMON_HEADERS, 'Content-Type': 'application/json' } });
         }
@@ -40,7 +41,6 @@ async function handleGetVideos(url) {
     const cursor = url.searchParams.get('cursor');
     if (!name) return jsonError("Nom manquant");
 
-    // Requête simplifiée pour éviter les erreurs de syntaxe
     const query = `query { user(login: "${name}") { profileImageURL(width: 70) videos(first: 20, type: ARCHIVE, sort: TIME${cursor ? `, after: "${cursor}"` : ""}) { edges { node { id, title, publishedAt, lengthSeconds, viewCount, previewThumbnailURL(height: 180, width: 320) } } pageInfo { hasNextPage, endCursor } } } }`;
     
     try {
@@ -72,14 +72,11 @@ async function handleGetLive(url, workerOrigin) {
         
         const links = parseAndProxyM3U8(await res.text(), res.url, workerOrigin, true);
         
-        // CORRECTION : On sépare la requête metadata et on enlève le champ "stream" qui posait problème
         const metaQuery = `query { user(login: "${login}") { profileImageURL(width: 70) broadcastSettings { title game { displayName } } } }`;
         const meta = await twitchGQL(metaQuery);
         
         const info = meta.data?.user?.broadcastSettings;
         const avatar = meta.data?.user?.profileImageURL;
-
-        // ASTUCE : On génère la miniature manuellement, c'est 100% fiable
         const manualThumbnail = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-640x360.jpg`;
 
         return jsonResponse({ 
@@ -138,6 +135,7 @@ async function handleGetM3U8(url, workerOrigin) {
     return jsonError("VOD introuvable ou protégée", 404);
 }
 
+// --- PROXY OPTIMISÉ ---
 async function handleProxy(url) {
     const target = url.searchParams.get('url');
     if (!target) return new Response("URL manquante", { status: 400 });
@@ -145,9 +143,18 @@ async function handleProxy(url) {
     const isVod = url.searchParams.get('isVod') === 'true';
     const workerOrigin = url.origin;
 
+    // OPTIMISATION : On récupère la réponse brute
     const res = await fetch(target, { headers: COMMON_HEADERS });
 
+    // Préparation des nouveaux en-têtes (Optimisation Cache)
+    const newHeaders = new Headers(res.headers);
+    newHeaders.set("Access-Control-Allow-Origin", "*");
+
+    // 1. Si c'est une playlist (.m3u8) -> Pas de cache (car ça change en live), on doit réécrire
     if (target.includes('.m3u8')) {
+        newHeaders.set("Content-Type", "application/vnd.apple.mpegurl");
+        newHeaders.set("Cache-Control", "no-cache, no-store, must-revalidate");
+
         const text = await res.text();
         const finalUrl = res.url; 
         const base = finalUrl.substring(0, finalUrl.lastIndexOf('/') + 1);
@@ -161,9 +168,16 @@ async function handleProxy(url) {
             }
             return full; 
         }).join('\n');
-        return new Response(newText, { status: res.status, headers: { ...COMMON_HEADERS, 'Content-Type': 'application/vnd.apple.mpegurl' } });
+
+        return new Response(newText, { status: res.status, headers: newHeaders });
     }
-    return new Response(res.body, { status: res.status, headers: { ...COMMON_HEADERS, 'Content-Type': 'video/MP2T' } });
+
+    // 2. Si c'est un segment vidéo (.ts) -> CACHE AGRESSIF
+    // On dit au navigateur : "Garde ce fichier pendant 1 an, il ne changera jamais"
+    newHeaders.set("Content-Type", "video/MP2T");
+    newHeaders.set("Cache-Control", "public, max-age=31536000, immutable");
+
+    return new Response(res.body, { status: res.status, headers: newHeaders });
 }
 
 // --- OUTILS ---
