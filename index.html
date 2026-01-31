@@ -6,8 +6,8 @@
     <title>Twitch VOD Unblocker</title>
     
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
-    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    <script src="https://cdn.plyr.io/3.8.4/plyr.js"></script>
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.8.4/plyr.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     
    <style>
@@ -28,12 +28,10 @@
         }
 
         #langSelect {
-            position: absolute; top: 15px; right: 15px;
-            background: #26262c; border: 1px solid #3a3a40; color: #888;
-            padding: 5px 10px; border-radius: 6px; cursor: pointer; 
-            font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
-            letter-spacing: 1px; transition: all 0.2s; z-index: 10;
-            appearance: none; -webkit-appearance: none; -moz-appearance: none; text-align: center; width: auto;
+            position: absolute; top: 15px; right: 15px; background: #26262c; border: 1px solid #3a3a40; 
+            color: #888; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; 
+            font-weight: 700; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s; 
+            z-index: 10; appearance: none; -webkit-appearance: none; -moz-appearance: none; text-align: center; width: auto;
         }
         #langSelect:hover { background: #3a3a40; color: white; border-color: var(--primary); transform: scale(1.05); }
         #langSelect:focus { outline: none; border-color: var(--primary); }
@@ -169,7 +167,7 @@
 
     <script>
         // --- CONFIGURATION CLOUDFLARE ---
-        const API_URL = "https://test2.kurzmathis4.workers.dev"; // C'est votre nouveau moteur !
+        const API_URL = "https://test2.kurzmathis4.workers.dev"; 
 
         // --- TRADUCTIONS ---
         const translations = {
@@ -262,7 +260,6 @@
             elements.liveArea.innerHTML = '';
             hidePlayer();
 
-            // MODIFICATION CLOUDFLARE : ON UTILISE API_URL
             const pVods = fetch(`${API_URL}/api/get-channel-videos?name=${channelName}`);
             const pLive = fetch(`${API_URL}/api/get-live?name=${channelName}`);
 
@@ -305,7 +302,6 @@
         async function watchLive() {
             const channelName = document.getElementById('channelInput').value.trim();
             try {
-                // MODIFICATION CLOUDFLARE
                 const response = await fetch(`${API_URL}/api/get-live?name=${channelName}`);
                 const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
@@ -327,7 +323,6 @@
             hidePlayer();
 
             try {
-                // MODIFICATION CLOUDFLARE
                 const response = await fetch(`${API_URL}/api/get-m3u8?id=${id}`);
                 const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
@@ -351,11 +346,14 @@
             changeQuality();
         }
 
+        // --- C'EST ICI QUE C'ÉTAIT FAUX ---
         function changeQuality() {
             const rawUrl = currentLinks[elements.qualitySelect.value];
             if (!rawUrl) return;
-            // MODIFICATION CLOUDFLARE : On utilise le proxy Cloudflare
-            const proxyUrl = `${API_URL}/api/proxy?url=${encodeURIComponent(rawUrl)}`;
+
+            // CORRECTION : On utilise le lien tel quel (il est déjà proxifié par le Worker V5)
+            const proxyUrl = rawUrl; 
+            
             elements.vlcInput.value = rawUrl;
             
             const video = document.getElementById('player');
@@ -408,4 +406,3 @@
     </script>
 </body>
 </html>
-
