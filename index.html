@@ -305,6 +305,33 @@
         };
 
         document.addEventListener('DOMContentLoaded', () => {
+            player = new Plyr('#player', {
+                controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'airplay', 'fullscreen'],
+                settings: ['speed']
+            });
+
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // 1. GESTION DES IDs (VOD)
+            const idFromUrl = urlParams.get('id');
+            if (idFromUrl) {
+                document.getElementById('vodInput').value = idFromUrl;
+                switchTab('direct');
+                searchVodById();
+            }
+
+            // 2. AJOUT : GESTION DES CHAÎNES (LIVE)
+            const channelFromUrl = urlParams.get('channel');
+            if (channelFromUrl) {
+                document.getElementById('channelInput').value = channelFromUrl;
+                switchTab('channel'); // On bascule sur l'onglet Streamer
+                searchStreamer();     // On lance la recherche automatiquement
+            }
+
+            if (/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
+            }
+        });
             // Détection automatique de la langue
             const userLang = navigator.language.slice(0, 2);
             if (translations[userLang]) {
@@ -533,3 +560,4 @@
     </script>
 </body>
 </html>
+
