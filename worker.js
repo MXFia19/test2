@@ -1,4 +1,4 @@
-// worker.js - VERSION V8 (Avatar + Thumbnail + Proxy VOD)
+// worker.js - VERSION V9 (Miniature Manuelle + Titre Restauré + Proxy VOD)
 const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 
 const COMMON_HEADERS = {
@@ -20,7 +20,7 @@ export default {
         const workerOrigin = url.origin; 
         
         try {
-            if (url.pathname === '/') return new Response("Twitch Proxy V8 Ready", { headers: COMMON_HEADERS });
+            if (url.pathname === '/') return new Response("Twitch Proxy V9 Ready", { headers: COMMON_HEADERS });
             if (url.pathname === '/api/get-live') return await handleGetLive(url, workerOrigin);
             if (url.pathname === '/api/get-channel-videos') return await handleGetVideos(url);
             if (url.pathname === '/api/get-m3u8') return await handleGetM3U8(url, workerOrigin);
@@ -40,8 +40,8 @@ async function handleGetVideos(url) {
     const cursor = url.searchParams.get('cursor');
     if (!name) return jsonError("Nom manquant");
 
-    // MODIFICATION ICI : On demande profileImageURL en plus des vidéos
-    const query = `query { user(login: "${name}") { profileImageURL(width: 150), videos(first: 20, type: ARCHIVE, sort: TIME${cursor ? `, after: "${cursor}"` : ""}) { edges { node { id, title, publishedAt, lengthSeconds, viewCount, previewThumbnailURL(height: 180, width: 320) } } pageInfo { hasNextPage, endCursor } } } }`;
+    // Requête simplifiée pour éviter les erreurs de syntaxe
+    const query = `query { user(login: "${name}") { profileImageURL(width: 70) videos(first: 20, type: ARCHIVE, sort: TIME${cursor ? `, after: "${cursor}"` : ""}) { edges { node { id, title, publishedAt, lengthSeconds, viewCount, previewThumbnailURL(height: 180, width: 320) } } pageInfo { hasNextPage, endCursor } } } }`;
     
     try {
         const data = await twitchGQL(query);
@@ -51,7 +51,7 @@ async function handleGetVideos(url) {
         return jsonResponse({ 
             videos: user.videos.edges.map(e => e.node), 
             pagination: user.videos.pageInfo,
-            avatar: user.profileImageURL // On renvoie l'avatar au site
+            avatar: user.profileImageURL
         });
     } catch (e) { return jsonError(e.message, 500); }
 }
@@ -72,20 +72,23 @@ async function handleGetLive(url, workerOrigin) {
         
         const links = parseAndProxyM3U8(await res.text(), res.url, workerOrigin, true);
         
-        // MODIFICATION ICI : On demande profileImageURL et stream.previewImage
-        const metaQuery = `query { user(login: "${login}") { profileImageURL(width: 150), broadcastSettings { title, game { displayName } }, stream { previewImage { url } } } }`;
+        // CORRECTION : On sépare la requête metadata et on enlève le champ "stream" qui posait problème
+        const metaQuery = `query { user(login: "${login}") { profileImageURL(width: 70) broadcastSettings { title game { displayName } } } }`;
         const meta = await twitchGQL(metaQuery);
+        
         const info = meta.data?.user?.broadcastSettings;
-        const stream = meta.data?.user?.stream;
         const avatar = meta.data?.user?.profileImageURL;
+
+        // ASTUCE : On génère la miniature manuellement, c'est 100% fiable
+        const manualThumbnail = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-640x360.jpg`;
 
         return jsonResponse({ 
             links, 
             best: links["Source"] || links["Auto"],
             title: info?.title || "Live", 
             game: info?.game?.displayName || "",
-            thumbnail: stream?.previewImage?.url || "", // On renvoie la miniature
-            avatar: avatar || "" // On renvoie l'avatar
+            thumbnail: manualThumbnail,
+            avatar: avatar || "" 
         });
     } catch (e) { return jsonError(e.message, 404); }
 }
@@ -117,7 +120,6 @@ async function handleGetM3U8(url, workerOrigin) {
             if (Object.keys(rawLinks).length > 0) {
                 let proxiedLinks = {};
                 const displayOrder = ['Source', '1080p60', '1080p30', '720p60', '720p30', '480p30', '360p30', '160p30', 'audio_only'];
-                
                 proxiedLinks["Auto"] = `${workerOrigin}/api/proxy?url=${encodeURIComponent(Object.values(rawLinks)[0])}&isVod=true`;
 
                 displayOrder.forEach(key => {
@@ -128,12 +130,7 @@ async function handleGetM3U8(url, workerOrigin) {
                         }
                     });
                 });
-                
-                return jsonResponse({ 
-                    links: proxiedLinks, 
-                    best: proxiedLinks["Source"] || proxiedLinks["Auto"],
-                    info: "Mode Backup Active" 
-                });
+                return jsonResponse({ links: proxiedLinks, best: proxiedLinks["Source"] || proxiedLinks["Auto"], info: "Mode Backup Active" });
             }
         }
     } catch (e) {}
@@ -164,17 +161,9 @@ async function handleProxy(url) {
             }
             return full; 
         }).join('\n');
-
-        return new Response(newText, { 
-            status: res.status,
-            headers: { ...COMMON_HEADERS, 'Content-Type': 'application/vnd.apple.mpegurl' } 
-        });
+        return new Response(newText, { status: res.status, headers: { ...COMMON_HEADERS, 'Content-Type': 'application/vnd.apple.mpegurl' } });
     }
-
-    return new Response(res.body, { 
-        status: res.status,
-        headers: { ...COMMON_HEADERS, 'Content-Type': 'video/MP2T' } 
-    });
+    return new Response(res.body, { status: res.status, headers: { ...COMMON_HEADERS, 'Content-Type': 'video/MP2T' } });
 }
 
 // --- OUTILS ---
@@ -224,38 +213,20 @@ async function storyboardHack(seekUrl) {
 function parseAndProxyM3U8(content, master, workerOrigin, isVod) {
     const lines = content.split('\n');
     const proxyBase = `${workerOrigin}/api/proxy?url=`;
-    
     let unsorted = {};
     let last = "";
-
     lines.forEach(l => {
         if (l.includes('VIDEO="')) {
-            try {
-                let n = l.split('VIDEO="')[1].split('"')[0];
-                if (n === 'chunked') n = 'Source';
-                last = n;
-            } catch(e) {}
+            try { let n = l.split('VIDEO="')[1].split('"')[0]; if (n === 'chunked') n = 'Source'; last = n; } catch(e) {}
         } else if (l.startsWith('http') && last) {
-            unsorted[last] = `${proxyBase}${encodeURIComponent(l)}&isVod=${isVod}`;
-            last = "";
+            unsorted[last] = `${proxyBase}${encodeURIComponent(l)}&isVod=${isVod}`; last = "";
         }
     });
-
     let sorted = {};
     sorted["Auto"] = `${proxyBase}${encodeURIComponent(master)}&isVod=${isVod}`;
-
     const displayOrder = ['Source', '1080p60', '1080p30', '720p60', '720p30', '480p30', '360p30', '160p30', 'audio_only'];
-
-    displayOrder.forEach(key => {
-        Object.keys(unsorted).forEach(foundKey => {
-            if (foundKey.toLowerCase().includes(key.toLowerCase())) {
-                sorted[foundKey] = unsorted[foundKey];
-                delete unsorted[foundKey];
-            }
-        });
-    });
+    displayOrder.forEach(key => { Object.keys(unsorted).forEach(k => { if (k.toLowerCase().includes(key.toLowerCase())) { sorted[k] = unsorted[k]; delete unsorted[k]; } }); });
     Object.assign(sorted, unsorted);
-
     return sorted;
 }
 
