@@ -159,7 +159,7 @@
                 <button class="btn-primary" onclick="searchStreamer()" data-lang="btn_search">🔍 Chercher (Live & VODs)</button>
             </div>
             <div id="live-area"></div>
-            </div>
+        </div>
 
         <div id="status-msg" data-lang="status_ready">Prêt.</div>
 
@@ -330,7 +330,8 @@
             } else if (channelFromUrl) {
                 document.getElementById('channelInput').value = channelFromUrl;
                 switchTab('channel');
-                searchStreamer();
+                // ON LANCE LA RECHERCHE EN MODE AUTO-PLAY (true)
+                searchStreamer(true);
             }
 
             // 4. Mobile Check
@@ -384,7 +385,8 @@
             }
         }
 
-        async function searchStreamer() {
+        // --- MODIFIÉ : ACCEPTE MAINTENANT UN PARAMÈTRE AUTO-PLAY ---
+        async function searchStreamer(autoPlay = false) {
             const channelName = document.getElementById('channelInput').value.trim();
             if (!channelName) return setStatus("err_missing", 'error');
 
@@ -402,12 +404,19 @@
 
                 if (!dataLive.error) {
                     const gameInfo = dataLive.game ? `[${txt('live_plays')} ${dataLive.game}]` : "";
+                    
+                    // Affiche le panneau
                     elements.liveArea.innerHTML = `
                         <div style="background: rgba(233, 25, 22, 0.15); border: 2px solid #e91916; padding: 15px; border-radius: 12px; margin-bottom: 25px; animation: fadeIn 0.5s;">
                             <h3 style="color: #ff4f4d; margin-bottom: 8px;">${txt('live_on')}</h3>
                             <p>${dataLive.title}<br><span style="color:#bbb; font-size:0.9rem;">${gameInfo}</span></p>
                             <button class="btn-primary" style="background-color: #e91916; width: 100%; margin-top:10px;" onclick="watchLive()">${txt('btn_watch_live')}</button>
                         </div>`;
+                    
+                    // SI AUTO-PLAY EST ACTIVÉ, ON LANCE LE LIVE DIRECTEMENT
+                    if (autoPlay) {
+                        watchLive();
+                    }
                 }
 
                 const dataVods = await resVods.json();
@@ -434,6 +443,9 @@
         async function watchLive() {
             const channelName = document.getElementById('channelInput').value.trim();
             try {
+                // NOTE : On ne cache plus vodList ici pour qu'elle reste visible en bas !
+                // elements.vodList.style.display = 'none'; <--- RETIRÉ
+                
                 const response = await fetch(`/api/get-live?name=${channelName}`);
                 const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
