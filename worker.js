@@ -1,15 +1,13 @@
-// worker.js
+// worker.js - CODE CORRIGÉ
 const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
-
-const QUALITY_ORDER = [
-    'chunked', 'source', '1080p60', '1080p30', '720p60', '720p30', '480p30', '360p30', '160p30', 'audio_only'
-];
 
 const COMMON_HEADERS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Referer': 'https://www.twitch.tv/',
+    'Origin': 'https://www.twitch.tv'
 };
 
 export default {
@@ -30,7 +28,8 @@ export default {
 
             return new Response("Not Found", { status: 404, headers: COMMON_HEADERS });
         } catch (e) {
-            return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: COMMON_HEADERS });
+            // En cas d'erreur, on renvoie l'erreur en JSON pour débugger
+            return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...COMMON_HEADERS, 'Content-Type': 'application/json' } });
         }
     }
 };
@@ -55,7 +54,7 @@ async function handleGetVideos(url) {
     const data = await twitchGQL(query);
     const videoData = data.data.user?.videos;
     
-    if (!videoData) return jsonError("Aucune vidéo trouvée", 404);
+    if (!videoData) return jsonError("Aucune vidéo trouvée (ou erreur Twitch)", 404);
 
     return jsonResponse({
         videos: videoData.edges.map(edge => edge.node),
@@ -113,6 +112,7 @@ async function handleProxy(url, request) {
 
     const isVod = url.searchParams.get('isVod') === 'true' || targetUrl.includes('/vod/');
     const originUrl = new URL(request.url);
+    // Correction URL pour supporter test2 ou autre
     const workerBase = `${originUrl.protocol}//${originUrl.host}/api/proxy`;
 
     if (targetUrl.includes('.m3u8')) {
@@ -145,12 +145,23 @@ async function handleProxy(url, request) {
 }
 
 // --- HELPERS ---
+
 async function twitchGQL(query, variables = {}) {
+    // ICI : Ajout du User-Agent critique pour éviter le blocage Twitch
     const res = await fetch('https://gql.twitch.tv/gql', {
         method: 'POST',
-        headers: { 'Client-ID': CLIENT_ID, 'Content-Type': 'application/json' },
+        headers: { 
+            'Client-ID': CLIENT_ID, 
+            'Content-Type': 'application/json',
+            'User-Agent': COMMON_HEADERS['User-Agent'] // <--- C'EST CA QUI MANQUAIT
+        },
         body: JSON.stringify({ query, variables })
     });
+    
+    if (!res.ok) {
+        throw new Error(`Twitch API Error ${res.status}`);
+    }
+
     return await res.json();
 }
 
