@@ -23,8 +23,8 @@
         .container { 
             width: 100%; max-width: 900px; background: var(--card); padding: 25px; 
             border-radius: 16px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); text-align: center; 
-            position: relative; /* Important pour le positionnement */
-            padding-top: 50px; /* Espace pour le bouton en haut */
+            position: relative; 
+            padding-top: 50px; 
         }
 
         /* --- LE PETIT MENU DÉGUISÉ EN BOUTON --- */
@@ -44,8 +44,6 @@
             letter-spacing: 1px;
             transition: all 0.2s;
             z-index: 10;
-            
-            /* ASTUCE : On cache la flèche par défaut pour que ça ressemble à un bouton */
             appearance: none; 
             -webkit-appearance: none; 
             -moz-appearance: none;
@@ -161,6 +159,7 @@
                 <button class="btn-primary" onclick="searchStreamer()" data-lang="btn_search">🔍 Chercher (Live & VODs)</button>
             </div>
             <div id="live-area"></div>
+            <div id="vod-list"></div>
         </div>
 
         <div id="status-msg" data-lang="status_ready">Prêt.</div>
@@ -185,12 +184,10 @@
                 <button class="btn-secondary mobile-only" style="background:var(--vlc)" onclick="openInVLC_Mobile()">VLC App</button>
             </div>
         </div>
-
-        <div id="vod-list"></div>
     </div>
 
     <script>
-        // --- DICTIONNAIRE DE LANGUES ---
+        // --- CONFIGURATION ---
         const translations = {
             fr: {
                 title: "Regarder Twitch sans Sub",
@@ -287,7 +284,7 @@
             }
         };
 
-        let currentLang = 'fr'; // Langue par défaut
+        let currentLang = 'fr';
         let currentLinks = {};
         let hls = null;
         let player = null;
@@ -304,35 +301,9 @@
             langSelect: document.getElementById('langSelect')
         };
 
+        // --- DÉMARRAGE ---
         document.addEventListener('DOMContentLoaded', () => {
-            player = new Plyr('#player', {
-                controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'airplay', 'fullscreen'],
-                settings: ['speed']
-            });
-
-            const urlParams = new URLSearchParams(window.location.search);
-            
-            // 1. GESTION DES IDs (VOD)
-            const idFromUrl = urlParams.get('id');
-            if (idFromUrl) {
-                document.getElementById('vodInput').value = idFromUrl;
-                switchTab('direct');
-                searchVodById();
-            }
-
-            // 2. AJOUT : GESTION DES CHAÎNES (LIVE)
-            const channelFromUrl = urlParams.get('channel');
-            if (channelFromUrl) {
-                document.getElementById('channelInput').value = channelFromUrl;
-                switchTab('channel'); // On bascule sur l'onglet Streamer
-                searchStreamer();     // On lance la recherche automatiquement
-            }
-
-            if (/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
-            }
-        });
-            // Détection automatique de la langue
+            // 1. Détection Langue
             const userLang = navigator.language.slice(0, 2);
             if (translations[userLang]) {
                 setLanguage(userLang);
@@ -340,52 +311,56 @@
                 setLanguage('fr');
             }
 
+            // 2. Player
             player = new Plyr('#player', {
                 controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'airplay', 'fullscreen'],
                 settings: ['speed']
             });
 
+            // 3. Gestion URL (ID ou Chaîne)
             const urlParams = new URLSearchParams(window.location.search);
             const idFromUrl = urlParams.get('id');
+            const channelFromUrl = urlParams.get('channel');
+
             if (idFromUrl) {
                 document.getElementById('vodInput').value = idFromUrl;
                 switchTab('direct');
                 searchVodById();
+            } else if (channelFromUrl) {
+                document.getElementById('channelInput').value = channelFromUrl;
+                switchTab('channel');
+                searchStreamer();
             }
 
+            // 4. Mobile Check
             if (/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
                 document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
             }
         });
 
-        // --- FONCTION DE TRADUCTION ---
+        // --- FONCTIONS ---
         function setLanguage(lang) {
             currentLang = lang;
             const t = translations[lang];
             
-            // On met à jour la valeur du select si changé programmatiquement
             if (elements.langSelect) elements.langSelect.value = lang;
 
-            // 1. Traduire les textes simples (data-lang)
             document.querySelectorAll('[data-lang]').forEach(el => {
                 const key = el.getAttribute('data-lang');
                 if (t[key]) el.textContent = t[key];
             });
 
-            // 2. Traduire les placeholders (champs de texte)
             document.querySelectorAll('[data-placeholder]').forEach(el => {
                 const key = el.getAttribute('data-placeholder');
                 if (t[key]) el.placeholder = t[key];
             });
         }
 
-        // Helper pour obtenir un texte traduit dans le JS
         function txt(key) {
             return translations[currentLang][key] || key;
         }
 
         function setStatus(msgKey, type, extra = "") {
-            // Si le message est une clé de traduction, on traduit. Sinon on affiche tel quel.
             const text = translations[currentLang][msgKey] ? translations[currentLang][msgKey] : msgKey;
             elements.status.textContent = text + extra;
             elements.status.className = type ? 'status-' + type : '';
@@ -560,4 +535,3 @@
     </script>
 </body>
 </html>
-
