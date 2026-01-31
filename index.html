@@ -28,35 +28,33 @@
             padding-top: 50px; 
         }
 
-        /* --- STYLE DU LECTEUR (TWITCH THEME) --- */
+        /* --- STYLE DU LECTEUR (MODERNE & ARRONDI) --- */
         #video-container { 
             width: 100%; 
             margin-bottom: 20px; 
             display: none; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.8); 
-            border: 1px solid #333; /* Bordure subtile comme Twitch */
+            border: 1px solid #333; 
+            border-radius: 12px; /* Coins arrondis pour le conteneur */
+            overflow: hidden; /* Important pour que la vidéo ne dépasse pas des coins */
         }
         
-        /* Personnalisation Plyr pour ressembler à Twitch */
+        /* Personnalisation Plyr */
         .plyr {
-            --plyr-color-main: #9146ff; /* Le violet Twitch */
+            --plyr-color-main: #9146ff; 
             --plyr-video-control-color: #efeff1;
             --plyr-video-control-background-hover: rgba(255, 255, 255, 0.15);
             --plyr-menu-background: #18181b;
             --plyr-menu-color: #efeff1;
             --plyr-menu-shadow: 0 4px 8px rgba(0,0,0,0.5);
-            --plyr-range-track-height: 4px;
-            --plyr-range-thumb-height: 14px;
-            --plyr-range-thumb-width: 14px;
-            --plyr-range-thumb-background: #ffffff;
             font-family: 'Inter', sans-serif;
-            border-radius: 0 !important; /* Coins carrés comme Twitch */
+            border-radius: 12px !important; /* Coins arrondis pour le lecteur */
         }
         
         /* Bouton Play central style Twitch */
         .plyr--video .plyr__control--overlaid {
             background: rgba(0, 0, 0, 0.6);
-            border-radius: 4px;
+            border-radius: 12px; /* Un peu plus carré mais doux */
         }
         .plyr--video .plyr__control--overlaid:hover {
             background: #9146ff;
