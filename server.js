@@ -1,9 +1,8 @@
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
+const path = require('path'); // Important pour les chemins de fichiers
 const app = express();
-
-// Pas de path ici, Vercel gère les fichiers statiques séparément
 
 app.use(cors());
 app.use(express.json());
@@ -25,9 +24,7 @@ const AXIOS_CONFIG = {
     validateStatus: status => status >= 200 && status < 500
 };
 
-// --- FONCTIONS UTILITAIRES ---
-// (J'ai gardé toutes tes fonctions à l'identique)
-
+// --- FONCTIONS UTILITAIRES (Identiques) ---
 async function getChannelVideos(login) {
     const data = {
         query: `query {
@@ -151,8 +148,9 @@ function parseM3U8(content, masterUrl) {
     return links;
 }
 
-// --- ROUTES API (On garde tout) ---
+// --- ROUTES ---
 
+// 1. PROXY
 app.get('/api/proxy', async (req, res) => {
     const targetUrl = req.query.url;
     if (!targetUrl) return res.status(400).send('URL manquante');
@@ -161,31 +159,28 @@ app.get('/api/proxy', async (req, res) => {
         if (targetUrl.includes('.m3u8')) {
             const response = await axios.get(targetUrl, { headers: AXIOS_CONFIG.headers, responseType: 'text' });
             const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
-            
             const newContent = response.data.split('\n').map(line => {
                 const l = line.trim();
                 if (!l || l.startsWith('#')) return l; 
                 const fullLink = l.startsWith('http') ? l : baseUrl + l;
                 return `/api/proxy?url=${encodeURIComponent(fullLink)}`;
             }).join('\n');
-
             res.set('Access-Control-Allow-Origin', '*');
             res.set('Content-Type', 'application/vnd.apple.mpegurl');
             return res.send(newContent);
         }
-
         const response = await axios({
             url: targetUrl, method: 'GET', responseType: 'stream', headers: AXIOS_CONFIG.headers
         });
         res.set('Access-Control-Allow-Origin', '*');
         res.set('Content-Type', response.headers['content-type']);
         response.data.pipe(res);
-
     } catch (e) {
         if (!res.headersSent) res.status(500).send('Erreur proxy');
     }
 });
 
+// 2. API Channel
 app.get('/api/get-channel-videos', async (req, res) => {
     const channelName = req.query.name;
     if (!channelName) return res.status(400).json({ error: 'Nom manquant' });
@@ -193,19 +188,15 @@ app.get('/api/get-channel-videos', async (req, res) => {
     return videos ? res.json({ videos }) : res.status(404).json({ error: "Chaîne introuvable ou aucune VOD." });
 });
 
+// 3. API Live
 app.get('/api/get-live', async (req, res) => {
     const channelName = req.query.name;
     if (!channelName) return res.status(400).json({ error: 'Nom manquant' });
-    
     const cleanName = channelName.trim().toLowerCase();
-    console.log(`\n🔴 Recherche LIVE : ${cleanName}`);
-
     const tokenData = await getLiveAccessToken(cleanName);
     if (!tokenData) return res.status(404).json({ error: "Offline" });
-
     const metadata = await getStreamMetadata(cleanName);
     const masterUrl = `https://usher.ttvnw.net/api/channel/hls/${cleanName}.m3u8?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&playlist_include_framerate=true&segment_preference=4&sig=${encodeURIComponent(tokenData.signature)}&token=${encodeURIComponent(tokenData.value)}`;
-
     try {
         const response = await axios.get(masterUrl, { headers: AXIOS_CONFIG.headers });
         const links = parseM3U8(response.data, masterUrl);
@@ -218,10 +209,10 @@ app.get('/api/get-live', async (req, res) => {
     }
 });
 
+// 4. API VOD
 app.get('/api/get-m3u8', async (req, res) => {
     const vodId = req.query.id;
     if (!vodId) return res.status(400).send('ID manquant');
-    
     const tokenData = await getAccessToken(vodId);
     if (tokenData) {
         const masterUrl = `https://usher.ttvnw.net/vod/${vodId}.m3u8?nauth=${tokenData.value}&nauthsig=${tokenData.signature}&allow_source=true&player_backend=mediaplayer`;
@@ -233,7 +224,6 @@ app.get('/api/get-m3u8', async (req, res) => {
             }
         } catch (e) {}
     }
-
     const metadata = await getVodStoryboardData(vodId);
     if (metadata && metadata.seekPreviewsURL) {
         const links = await storyboardHack(metadata.seekPreviewsURL);
@@ -244,5 +234,10 @@ app.get('/api/get-m3u8', async (req, res) => {
     res.status(404).json({ error: "VOD introuvable." });
 });
 
-// --- MODIFICATION POUR VERCEL : EXPORT AU LIEU DE LISTEN ---
+// 5. ROUTE RACINE (Celle qui manquait pour l'erreur "Cannot GET /")
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// --- EXPORT POUR VERCEL ---
 module.exports = app;
