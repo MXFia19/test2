@@ -52,7 +52,6 @@
         .btn-primary { background: var(--primary); }
         .btn-secondary { background: #3a3a40; font-size: 0.9rem; width: 100%; margin-top: 10px; }
 
-        /* NOUVEAU DESIGN LIVE */
         .live-card {
             background: rgba(0,0,0,0.2); border: 1px solid #3a3a40; border-radius: 12px; 
             padding: 15px; margin-bottom: 25px; text-align: left; animation: fadeIn 0.5s;
@@ -65,10 +64,7 @@
         .live-info { flex: 1; min-width: 200px; }
         .live-title { font-weight: 700; margin-bottom: 5px; line-height: 1.2; }
         .live-game { color: var(--primary); font-size: 0.9rem; font-weight: 600; }
-        .live-badge { 
-            display: inline-block; background: #e91916; color: white; font-size: 0.7rem; 
-            padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-bottom: 5px; 
-        }
+        .live-badge { display: inline-block; background: #e91916; color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-bottom: 5px; }
 
         #vod-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 20px; max-height: 50vh; overflow-y: auto; padding: 5px; display: none; }
         .vod-card { background: #26262c; border-radius: 10px; overflow: hidden; cursor: pointer; text-align: left; }
@@ -152,9 +148,9 @@
         const API_URL = "https://test2.kurzmathis4.workers.dev"; // URL DU WORKER
 
         const translations = {
-            fr: { title: "Regarder Twitch sans Sub", tab_id: "Lien / ID", tab_streamer: "Streamer", mobile_title: "📱 Mode Mobile", mobile_desc: "Astuce : utilisez Outplayer ou VLC.", ph_id: "ID ou Lien de la VOD", btn_unlock: "Déverrouiller", ph_streamer: "Nom du Streamer", btn_search: "🔍 Chercher (Live & VODs)", status_ready: "Prêt.", lbl_quality: "Qualité :", btn_pip: "📺 Activer PiP", btn_dl: "📥 Télécharger (Fichier)", lbl_link: "Lien externe :", btn_copy: "Copier", err_missing: "Nom manquant.", loading: "Recherche de", live_on: "EN DIRECT", btn_watch_live: "▶️ Regarder le Live", no_vod: "Aucune VOD trouvée.", vods_found: "VODs trouvées.", err_network: "Erreur réseau.", err_live: "Erreur Live.", loading_vod: "Chargement VOD...", vod_ready: "VOD Prête !", err_conn: "Erreur connexion.", copied: "Lien copié !", offline: "HORS LIGNE", offline_msg: "Ce streamer n'est pas en direct.", last_live: "Dernier live le : " },
-            en: { title: "Watch Twitch No Sub", tab_id: "Link / ID", tab_streamer: "Streamer", mobile_title: "📱 Mobile Mode", mobile_desc: "Tip: use Outplayer or VLC app.", ph_id: "VOD ID or Link", btn_unlock: "Unlock", ph_streamer: "Streamer Name", btn_search: "🔍 Search (Live & VODs)", status_ready: "Ready.", lbl_quality: "Quality:", btn_pip: "📺 Toggle PiP", btn_dl: "📥 Download (File)", lbl_link: "External Link:", btn_copy: "Copy", err_missing: "Name missing.", loading: "Searching for", live_on: "LIVE NOW", btn_watch_live: "▶️ Watch Live", no_vod: "No VODs found.", vods_found: "VODs found.", err_network: "Network error.", err_live: "Live error.", loading_vod: "Loading VOD...", vod_ready: "VOD Ready!", err_conn: "Connection error.", copied: "Link copied!", offline: "OFFLINE", offline_msg: "This streamer is not live.", last_live: "Last live on: " },
-            es: { title: "Ver Twitch sin Sub", tab_id: "Enlace / ID", tab_streamer: "Streamer", mobile_title: "📱 Modo Móvil", mobile_desc: "Consejo: usa Outplayer o VLC.", ph_id: "ID o Enlace VOD", btn_unlock: "Desbloquear", ph_streamer: "Nombre del Streamer", btn_search: "🔍 Buscar (Live & VODs)", status_ready: "Listo.", lbl_quality: "Calidad:", btn_pip: "📺 Modo PiP", btn_dl: "📥 Descargar", lbl_link: "Enlace externo:", btn_copy: "Copiar", err_missing: "Falta el nombre.", loading: "Buscando a", live_on: "EN VIVO", btn_watch_live: "▶️ Ver Directo", no_vod: "No se encontraron VODs.", vods_found: "VODs encontrados.", err_network: "Error de red.", err_live: "Error de directo.", loading_vod: "Cargando VOD...", vod_ready: "VOD Listo!", err_conn: "Error de conexión.", copied: "Enlace copiado!", offline: "DESCONECTADO", offline_msg: "Este streamer no está en directo.", last_live: "Último directo el: " }
+            fr: { title: "Regarder Twitch sans Sub", tab_id: "Lien / ID", tab_streamer: "Streamer", mobile_title: "📱 Mode Mobile", mobile_desc: "Astuce : utilisez Outplayer ou VLC.", ph_id: "ID ou Lien de la VOD", btn_unlock: "Déverrouiller", ph_streamer: "Nom du Streamer", btn_search: "🔍 Chercher (Live & VODs)", status_ready: "Prêt.", lbl_quality: "Qualité :", btn_pip: "📺 Activer PiP", btn_dl: "📥 Télécharger (Fichier)", lbl_link: "Lien externe :", btn_copy: "Copier", err_missing: "Nom manquant.", loading: "Recherche de", live_on: "EN DIRECT", btn_watch_live: "▶️ Regarder le Live", no_vod: "Aucune VOD trouvée.", vods_found: "VODs trouvées.", err_network: "Erreur réseau.", err_live: "Erreur Live.", loading_vod: "Chargement VOD...", vod_ready: "VOD Prête !", err_conn: "Erreur connexion.", copied: "Lien copié !", offline: "HORS LIGNE", offline_since: "Hors ligne depuis : ", day: "j", hour: "h", min: "min" },
+            en: { title: "Watch Twitch No Sub", tab_id: "Link / ID", tab_streamer: "Streamer", mobile_title: "📱 Mobile Mode", mobile_desc: "Tip: use Outplayer or VLC app.", ph_id: "VOD ID or Link", btn_unlock: "Unlock", ph_streamer: "Streamer Name", btn_search: "🔍 Search (Live & VODs)", status_ready: "Ready.", lbl_quality: "Quality:", btn_pip: "📺 Toggle PiP", btn_dl: "📥 Download (File)", lbl_link: "External Link:", btn_copy: "Copy", err_missing: "Name missing.", loading: "Searching for", live_on: "LIVE NOW", btn_watch_live: "▶️ Watch Live", no_vod: "No VODs found.", vods_found: "VODs found.", err_network: "Network error.", err_live: "Live error.", loading_vod: "Loading VOD...", vod_ready: "VOD Ready!", err_conn: "Connection error.", copied: "Link copied!", offline: "OFFLINE", offline_since: "Offline since: ", day: "d", hour: "h", min: "min" },
+            es: { title: "Ver Twitch sin Sub", tab_id: "Enlace / ID", tab_streamer: "Streamer", mobile_title: "📱 Modo Móvil", mobile_desc: "Consejo: usa Outplayer o VLC.", ph_id: "ID o Enlace VOD", btn_unlock: "Desbloquear", ph_streamer: "Nombre del Streamer", btn_search: "🔍 Buscar (Live & VODs)", status_ready: "Listo.", lbl_quality: "Calidad:", btn_pip: "📺 Modo PiP", btn_dl: "📥 Descargar", lbl_link: "Enlace externo:", btn_copy: "Copiar", err_missing: "Falta el nombre.", loading: "Buscando a", live_on: "EN VIVO", btn_watch_live: "▶️ Ver Directo", no_vod: "No se encontraron VODs.", vods_found: "VODs encontrados.", err_network: "Error de red.", err_live: "Error de directo.", loading_vod: "Cargando VOD...", vod_ready: "VOD Listo!", err_conn: "Error de conexión.", copied: "Enlace copiado!", offline: "DESCONECTADO", offline_since: "Desconectado desde: ", day: "d", hour: "h", min: "min" }
         };
 
         let currentLang = 'fr';
@@ -192,6 +188,23 @@
             else { document.querySelector('.tab-btn:nth-child(2)').classList.add('active'); document.getElementById('tab-channel').classList.add('active'); if (elements.vodList.children.length > 0) elements.vodList.style.display = 'grid'; }
         }
 
+        // FONCTION POUR CALCULER LE TEMPS ECOULÉ
+        function getTimeSince(dateString, durationSeconds) {
+            const endDate = new Date(new Date(dateString).getTime() + durationSeconds * 1000);
+            const now = new Date();
+            const diff = now - endDate;
+
+            if (diff < 0) return ""; 
+
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+
+            if (days > 0) return `${days} ${txt('day')}`;
+            if (hours > 0) return `${hours} ${txt('hour')}`;
+            return `${minutes} ${txt('min')}`;
+        }
+
         async function searchStreamer(autoPlay = false) {
             const channelName = document.getElementById('channelInput').value.trim();
             if (!channelName) return setStatus("err_missing", 'error');
@@ -226,12 +239,15 @@
                         </div>`;
                     if (autoPlay) watchLive();
                 } else {
-                    // AFFICHAGE DU DERNIER LIVE SI OFFLINE
-                    let lastLiveText = "";
+                    // CALCUL ET AFFICHAGE DU "HORS LIGNE DEPUIS"
+                    let offlineText = txt('offline_msg'); // Message par défaut
+                    
                     if (!dataVods.error && dataVods.videos && dataVods.videos.length > 0) {
                         const lastVod = dataVods.videos[0];
-                        const lastDate = new Date(lastVod.publishedAt).toLocaleDateString(currentLang === 'fr' ? 'fr-FR' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' });
-                        lastLiveText = `<div style="font-size: 0.85rem; color: #888; margin-top: 5px;">${txt('last_live')} ${lastDate}</div>`;
+                        const timeSinceStr = getTimeSince(lastVod.publishedAt, lastVod.lengthSeconds);
+                        if (timeSinceStr) {
+                            offlineText = `<span style="color:#e91916; font-weight:700;">${txt('offline_since')} ${timeSinceStr}</span>`;
+                        }
                     }
 
                     elements.liveArea.innerHTML = `
@@ -239,8 +255,7 @@
                             <img src="${avatarUrl}" class="live-avatar" style="border-color:#555">
                             <div class="live-info">
                                 <span class="live-badge" style="background:#555">${txt('offline')}</span>
-                                <div class="live-title" style="color:#aaa">${txt('offline_msg')}</div>
-                                ${lastLiveText}
+                                <div class="live-title" style="color:#aaa; margin-top:5px;">${offlineText}</div>
                             </div>
                         </div>`;
                 }
