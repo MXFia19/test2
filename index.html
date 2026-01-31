@@ -3,565 +3,325 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Twitch VOD Player</title>
+    <title>Twitch VOD Unblocker</title>
     
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://cdn.plyr.io/3.8.4/plyr.js"></script>
     <link rel="stylesheet" href="https://cdn.plyr.io/3.8.4/plyr.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     
    <style>
-        :root {
-            --twitch-bg: #0e0e10;
-            --twitch-surface: #18181b;
-            --twitch-hover: #26262c;
-            --twitch-purple: #9146ff;
-            --twitch-text: #efeff1;
-            --twitch-text-alt: #adadb8;
-            --plyr-color-main: #9146ff;
-            --plyr-control-radius: 4px;
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+        :root { --primary: #9146ff; --dark: #0e0e10; --card: #18181b; --text: #efeff1; --danger: #ff4f4d; --outplayer: #007aff; --vlc: #ff8800; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body, button, input, select { font-family: 'Inter', sans-serif; }
         
         body { 
-            background-color: var(--twitch-bg); 
-            color: var(--twitch-text); 
-            font-family: 'Inter', sans-serif;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
+            background-color: var(--dark); color: var(--text); 
+            display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; 
         }
 
-        /* --- NAVBAR STYLE TWITCH --- */
-        .navbar {
-            height: 50px;
-            background: var(--twitch-surface);
-            border-bottom: 1px solid #000;
-            display: flex;
-            align-items: center;
-            padding: 0 15px;
-            gap: 20px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-            position: sticky; top: 0; z-index: 100;
+        .container { 
+            width: 100%; max-width: 900px; background: var(--card); padding: 25px; 
+            border-radius: 16px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); text-align: center; 
+            position: relative; 
+            padding-top: 50px; 
         }
 
-        .logo { font-weight: 700; color: var(--twitch-purple); font-size: 1.1rem; display: flex; align-items: center; gap: 5px; }
-        
-        .search-area {
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            max-width: 400px;
-            margin: 0 auto;
-        }
-        
-        .input-group {
-            display: flex;
-            width: 100%;
-            background: #000;
-            border-radius: 6px;
-            border: 1px solid #3a3a3a; /* Bordure discrète */
-            overflow: hidden;
-            transition: 0.2s;
-        }
-        .input-group:focus-within { border-color: var(--twitch-purple); background: #000; }
-
-        input[type="text"] {
-            background: transparent;
-            border: none;
-            color: white;
-            padding: 8px 12px;
-            width: 100%;
-            font-size: 0.9rem;
-            font-weight: 500;
+        #langSelect {
+            position: absolute; top: 15px; right: 15px; background: #26262c; border: 1px solid #3a3a40; 
+            color: #888; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; 
+            font-weight: 700; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s; 
+            z-index: 10; appearance: none; -webkit-appearance: none; -moz-appearance: none; text-align: center; width: auto;
         }
 
-        .search-btn {
-            background: #3a3a3a;
-            border: none;
-            padding: 0 12px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .search-btn:hover { background: #4a4a4a; }
+        h1 { font-weight: 800; margin-bottom: 20px; color: #bf94ff; font-size: 1.5rem; margin-top: 0; }
+        .mobile-only { display: none; }
+        #mobile-alert { display: none; background: rgba(145, 70, 255, 0.15); border: 1px solid var(--primary); color: #e0ccff; padding: 15px; border-radius: 12px; margin-bottom: 20px; text-align: left; }
 
-        .lang-select {
-            background: transparent;
-            color: var(--twitch-text);
-            border: none;
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-        }
-
-        /* --- MAIN CONTENT --- */
-        .main-container {
-            flex: 1;
-            width: 100%;
-            max-width: 1600px;
-            margin: 0 auto;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        /* --- TABS STYLE TWITCH --- */
-        .tabs {
-            display: flex;
-            gap: 20px;
-            border-bottom: 2px solid #26262c;
-            margin-bottom: 10px;
-        }
-        .tab-btn {
-            background: transparent;
-            border: none;
-            color: var(--twitch-text-alt);
-            font-weight: 600;
-            font-size: 0.95rem;
-            padding: 10px 0;
-            cursor: pointer;
-            position: relative;
-            transition: 0.2s;
-        }
-        .tab-btn:hover { color: var(--twitch-purple); }
-        .tab-btn.active { color: var(--twitch-purple); }
-        .tab-btn.active::after {
-            content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 2px; background: var(--twitch-purple);
-        }
-
-        .tab-content { display: none; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; background: #26262c; padding: 5px; border-radius: 12px; }
+        .tab-btn { flex: 1; background: transparent; border: none; color: #aaa; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.3s; }
+        .tab-btn.active { background: var(--card); color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .tab-content { display: none; animation: fadeIn 0.3s; }
         .tab-content.active { display: block; }
 
-        /* --- PLAYER AREA --- */
-        #video-container {
-            width: 100%;
-            background: #000;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            display: none; /* Caché par défaut */
-        }
-        .plyr { 
-            height: 100%; 
-            border-radius: 0; 
-            font-family: 'Inter', sans-serif;
-        }
+        .search-bar { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap;}
+        input[type="text"] { background: #26262c; border: 2px solid #3a3a40; color: white; padding: 12px; border-radius: 10px; font-size: 1rem; flex: 1; min-width: 200px; transition: 0.2s; }
+        input[type="text"]:focus { outline: none; border-color: var(--primary); }
+        button { border: none; padding: 12px 20px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 1rem; color: white; transition: 0.2s; white-space: nowrap; }
+        .btn-primary { background: var(--primary); }
+        .btn-secondary { background: #3a3a40; font-size: 0.9rem; width: 100%; margin-top: 10px; }
 
-        /* --- INFO & STATUS --- */
-        #status-msg { margin: 10px 0; font-weight: 600; font-size: 0.9rem; min-height: 20px; }
+        .live-card {
+            background: rgba(0,0,0,0.2); border: 1px solid #3a3a40; border-radius: 12px; 
+            padding: 15px; margin-bottom: 25px; text-align: left; animation: fadeIn 0.5s;
+            display: flex; gap: 15px; flex-wrap: wrap; align-items: center;
+        }
+        .live-card.online { border-color: #e91916; background: rgba(233, 25, 22, 0.05); }
+        .live-thumb-container { position: relative; width: 180px; aspect-ratio: 16/9; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+        .live-thumb { width: 100%; height: 100%; object-fit: cover; }
+        .live-avatar { width: 50px; height: 50px; border-radius: 50%; border: 2px solid var(--primary); object-fit: cover; }
+        .live-info { flex: 1; min-width: 200px; }
+        .live-title { font-weight: 700; margin-bottom: 5px; line-height: 1.2; }
+        .live-game { color: var(--primary); font-size: 0.9rem; font-weight: 600; }
+        .live-badge { display: inline-block; background: #e91916; color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-bottom: 5px; }
+
+        #vod-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 20px; max-height: 50vh; overflow-y: auto; padding: 5px; display: none; }
+        .vod-card { background: #26262c; border-radius: 10px; overflow: hidden; cursor: pointer; text-align: left; }
+        .vod-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; }
+        .vod-info { padding: 8px; }
+        .vod-title { font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .vod-meta { font-size: 0.7rem; color: #aaa; }
+
+        #video-container { width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 20px; display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
+        #options-bar, .vlc-section { display: none; flex-direction: column; gap: 10px; margin-bottom: 20px; background: #1f1f23; padding: 15px; border-radius: 12px; }
+        select { background: #26262c; color: white; border: 1px solid #3a3a40; padding: 10px; border-radius: 8px; font-size: 1rem; width: 100%; }
+        input.vlc-link { width: 100%; font-family: monospace; color: #bf94ff; text-align: center; font-size: 0.8rem; }
+        #status-msg { margin-bottom: 15px; font-weight: 500; min-height: 1.2em; font-size: 0.9rem; }
         .status-loading { color: #e6e619; } .status-success { color: #00ff88; } .status-error { color: #ff4f4d; }
 
-        /* --- LIVE CARD (HEADER STREAMER) --- */
-        .live-header {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 20px;
-            background: var(--twitch-surface);
-            border-bottom: 1px solid #000;
-            display: none; /* Caché par défaut */
+        @media (max-width: 600px) { 
+            .container { padding: 15px; padding-top: 45px; width: 100%; } 
+            .live-thumb-container { width: 100%; }
         }
-        .live-avatar { width: 64px; height: 64px; border-radius: 50%; border: 3px solid transparent; object-fit: cover; }
-        .live-avatar.online { border-color: #e91916; }
-        
-        .live-meta { flex: 1; }
-        .live-user { font-weight: 700; font-size: 1.2rem; display: flex; align-items: center; gap: 8px; }
-        .live-game { color: var(--twitch-purple); font-weight: 500; font-size: 0.9rem; }
-        .live-badge { background: #e91916; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
-        .offline-badge { background: #555; color: #ddd; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
-        
-        .live-preview { width: 280px; aspect-ratio: 16/9; border-radius: 6px; object-fit: cover; display: none; }
-
-        /* --- VODS GRID --- */
-        .vod-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 15px;
-            padding: 10px 0;
-            display: none;
-        }
-        .vod-card {
-            background: transparent;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .vod-card:hover .vod-thumb-img { transform: translate(4px, -4px); box-shadow: -4px 4px 0 var(--twitch-purple); }
-        
-        .vod-thumb-box { position: relative; aspect-ratio: 16/9; margin-bottom: 8px; }
-        .vod-thumb-img { width: 100%; height: 100%; object-fit: cover; transition: 0.2s; }
-        .vod-duration { 
-            position: absolute; bottom: 5px; right: 5px; 
-            background: rgba(0,0,0,0.6); color: white; 
-            font-size: 0.75rem; padding: 2px 4px; border-radius: 2px; 
-        }
-        
-        .vod-title { font-weight: 600; font-size: 0.9rem; line-height: 1.4; color: var(--twitch-text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .vod-date { font-size: 0.8rem; color: var(--twitch-text-alt); margin-top: 4px; }
-
-        /* --- OPTIONS BAR --- */
-        .options-bar {
-            display: none;
-            flex-wrap: wrap;
-            gap: 15px;
-            align-items: center;
-            background: var(--twitch-surface);
-            padding: 10px 15px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-        }
-        .btn-twitch {
-            background: var(--twitch-hover);
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 4px;
-            font-weight: 600;
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .btn-twitch:hover { background: #3a3a40; }
-        .btn-primary { background: var(--twitch-purple); color: white; }
-        .btn-primary:hover { background: #772ce8; }
-        
-        select {
-            background: var(--twitch-bg);
-            color: white;
-            border: 1px solid #3a3a3a;
-            padding: 5px 10px;
-            border-radius: 4px;
-            font-weight: 600;
-        }
-
-        #mobile-alert { display: none; padding: 10px; background: #2f2f35; margin: 10px; border-radius: 4px; font-size: 0.9rem; }
-        @media (max-width: 600px) {
-            .navbar { padding: 0 10px; gap: 10px; }
-            .logo span { display: none; }
-            .live-header { flex-direction: column; align-items: flex-start; }
-            .live-preview { width: 100%; }
-        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
 
-    <div class="navbar">
-        <div class="logo">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--twitch-purple)"><path d="M2.149 0L.537 4.119v16.836h5.731V24h3.224l3.045-3.045h4.657l6.269-6.269V0H2.149zm19.164 13.612l-3.582 3.582H12l-3.045 3.045v-3.045H4.119V2.149h17.194v11.463z"/><path d="M10.388 6.269h2.149v5.731h-2.149V6.269zm5.373 0h2.149v5.731h-2.149V6.269z"/></svg>
-            <span>VOD Player</span>
+    <div class="container">
+        <select id="langSelect" onchange="setLanguage(this.value)"><option value="fr">FR</option><option value="en">EN</option><option value="es">ES</option></select>
+        <h1 data-lang="title">Twitch VOD Unblocker</h1>
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('direct')" data-lang="tab_id">Lien / ID</button>
+            <button class="tab-btn" onclick="switchTab('channel')" data-lang="tab_streamer">Streamer</button>
         </div>
 
-        <div class="search-area">
-            <div class="input-group">
-                <input type="text" id="searchInput" placeholder="Rechercher Streamer..." onkeydown="if(event.key==='Enter') doSearch()">
-                <button class="search-btn" onclick="doSearch()">🔍</button>
+        <div id="mobile-alert" class="mobile-only">
+            <strong data-lang="mobile_title">📱 Mode Mobile</strong> <span data-lang="mobile_desc">Astuce : utilisez Outplayer ou VLC.</span>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <button class="btn-secondary" style="background:var(--outplayer)" onclick="openInOutplayer()">Outplayer</button>
+                <button class="btn-secondary" style="background:var(--vlc)" onclick="openInVLC_Mobile()">VLC</button>
             </div>
         </div>
 
-        <select id="langSelect" class="lang-select" onchange="setLanguage(this.value)">
-            <option value="fr">FR</option>
-            <option value="en">EN</option>
-            <option value="es">ES</option>
-        </select>
-    </div>
-
-    <div id="mobile-alert" class="mobile-only">
-        📱 <span data-lang="mobile_desc">Mobile? Utilisez VLC/Outplayer.</span>
-    </div>
-
-    <div id="liveHeader" class="live-header">
+        <div id="tab-direct" class="tab-content active">
+            <div class="search-bar">
+                <input type="text" id="vodInput" placeholder="ID ou Lien de la VOD" data-placeholder="ph_id">
+                <button class="btn-primary" onclick="searchVodById()" data-lang="btn_unlock">Déverrouiller</button>
+            </div>
         </div>
 
-    <div class="main-container">
-
-        <div class="tabs">
-            <button class="tab-btn" id="tab-channel" onclick="switchMode('channel')" data-lang="tab_streamer">Chaîne</button>
-            <button class="tab-btn" id="tab-direct" onclick="switchMode('direct')" data-lang="tab_id">ID Vidéo</button>
+        <div id="tab-channel" class="tab-content">
+            <div class="search-bar">
+                <input type="text" id="channelInput" placeholder="Nom du Streamer" data-placeholder="ph_streamer">
+                <button class="btn-primary" onclick="searchStreamer()" data-lang="btn_search">🔍 Chercher (Live & VODs)</button>
+            </div>
+            <div id="live-area"></div>
         </div>
 
-        <div id="status-msg"></div>
+        <div id="status-msg" data-lang="status_ready">Prêt.</div>
+        <div id="video-container"><video id="player" playsinline controls crossorigin></video></div>
 
-        <div id="video-container">
-            <video id="player" playsinline controls crossorigin></video>
-        </div>
-
-        <div id="options-bar" class="options-bar">
+        <div id="options-bar">
+            <label data-lang="lbl_quality">Qualité :</label>
             <select id="qualitySelect" onchange="changeQuality()"></select>
-            <button class="btn-twitch" onclick="togglePiP()" data-lang="btn_pip">📺 PiP</button>
-            <button class="btn-twitch" onclick="downloadM3U8()" data-lang="btn_dl">📥 M3U8</button>
-            <input type="text" id="vlcLink" readonly style="background:#000; border:none; color:#555; width: 10px; opacity:0;">
-            <button class="btn-twitch" onclick="copyLink()" data-lang="btn_copy">📋 Copier Lien</button>
-            <button class="btn-primary mobile-only" onclick="openInOutplayer()">Outplayer</button>
-            <button class="btn-primary mobile-only" onclick="openInVLC_Mobile()">VLC</button>
+            <button class="btn-secondary" onclick="togglePiP()" style="background-color: #e6e619; color: black;" data-lang="btn_pip">📺 Activer PiP</button>
+            <button class="btn-secondary" onclick="downloadM3U8()" data-lang="btn_dl">📥 Télécharger (Fichier)</button>
         </div>
 
-        <div id="vod-list" class="vod-grid"></div>
+        <div id="vlc-section" class="vlc-section">
+            <div style="font-size: 0.8rem; color: #aaa;" data-lang="lbl_link">Lien externe :</div>
+            <input type="text" id="vlcLink" class="vlc-link" readonly onclick="this.select()">
+            <div style="display:flex; gap:10px;">
+                <button class="btn-secondary" onclick="copyLink()" data-lang="btn_copy">Copier</button>
+                <button class="btn-secondary mobile-only" style="background:var(--outplayer)" onclick="openInOutplayer()">Outplayer</button>
+                <button class="btn-secondary mobile-only" style="background:var(--vlc)" onclick="openInVLC_Mobile()">VLC App</button>
+            </div>
+        </div>
 
+        <div id="vod-list"></div>
     </div>
 
     <script>
-        const API_URL = "https://test2.kurzmathis4.workers.dev"; // VOTRE WORKER
+        const API_URL = "https://test2.kurzmathis4.workers.dev"; // URL DU WORKER
 
         const translations = {
-            fr: { tab_id: "ID Vidéo", tab_streamer: "Chaîne", mobile_desc: "Mobile? Utilisez VLC ou Outplayer.", btn_pip: "Fenêtre Flottante", btn_dl: "Fichier M3U", btn_copy: "Copier Lien", err_missing: "Nom manquant", loading: "Chargement...", live_on: "LIVE", offline: "HORS LIGNE", offline_msg: "Pas de stream en cours.", last_live: "Dernier live : ", no_vod: "Aucune VOD trouvée.", btn_watch_live: "Regarder le Live" },
-            en: { tab_id: "Video ID", tab_streamer: "Channel", mobile_desc: "Mobile? Use VLC or Outplayer.", btn_pip: "PiP Mode", btn_dl: "M3U File", btn_copy: "Copy Link", err_missing: "Missing name", loading: "Loading...", live_on: "LIVE", offline: "OFFLINE", offline_msg: "Stream is offline.", last_live: "Last live: ", no_vod: "No VODs found.", btn_watch_live: "Watch Live" },
-            es: { tab_id: "ID Video", tab_streamer: "Canal", mobile_desc: "¿Móvil? Usa VLC o Outplayer.", btn_pip: "Modo PiP", btn_dl: "Archivo M3U", btn_copy: "Copiar Enlace", err_missing: "Falta nombre", loading: "Cargando...", live_on: "EN VIVO", offline: "OFFLINE", offline_msg: "No hay directo.", last_live: "Último live: ", no_vod: "No hay VODs.", btn_watch_live: "Ver Directo" }
+            fr: { title: "Regarder Twitch sans Sub", tab_id: "Lien / ID", tab_streamer: "Streamer", mobile_title: "📱 Mode Mobile", mobile_desc: "Astuce : utilisez Outplayer ou VLC.", ph_id: "ID ou Lien de la VOD", btn_unlock: "Déverrouiller", ph_streamer: "Nom du Streamer", btn_search: "🔍 Chercher (Live & VODs)", status_ready: "Prêt.", lbl_quality: "Qualité :", btn_pip: "📺 Activer PiP", btn_dl: "📥 Télécharger (Fichier)", lbl_link: "Lien externe :", btn_copy: "Copier", err_missing: "Nom manquant.", loading: "Recherche de", live_on: "EN DIRECT", btn_watch_live: "▶️ Regarder le Live", no_vod: "Aucune VOD trouvée.", vods_found: "VODs trouvées.", err_network: "Erreur réseau.", err_live: "Erreur Live.", loading_vod: "Chargement VOD...", vod_ready: "VOD Prête !", err_conn: "Erreur connexion.", copied: "Lien copié !", offline: "HORS LIGNE", offline_since: "Hors ligne depuis : ", day: "j", hour: "h", min: "min" },
+            en: { title: "Watch Twitch No Sub", tab_id: "Link / ID", tab_streamer: "Streamer", mobile_title: "📱 Mobile Mode", mobile_desc: "Tip: use Outplayer or VLC app.", ph_id: "VOD ID or Link", btn_unlock: "Unlock", ph_streamer: "Streamer Name", btn_search: "🔍 Search (Live & VODs)", status_ready: "Ready.", lbl_quality: "Quality:", btn_pip: "📺 Toggle PiP", btn_dl: "📥 Download (File)", lbl_link: "External Link:", btn_copy: "Copy", err_missing: "Name missing.", loading: "Searching for", live_on: "LIVE NOW", btn_watch_live: "▶️ Watch Live", no_vod: "No VODs found.", vods_found: "VODs found.", err_network: "Network error.", err_live: "Live error.", loading_vod: "Loading VOD...", vod_ready: "VOD Ready!", err_conn: "Connection error.", copied: "Link copied!", offline: "OFFLINE", offline_since: "Offline since: ", day: "d", hour: "h", min: "min" },
+            es: { title: "Ver Twitch sin Sub", tab_id: "Enlace / ID", tab_streamer: "Streamer", mobile_title: "📱 Modo Móvil", mobile_desc: "Consejo: usa Outplayer o VLC.", ph_id: "ID o Enlace VOD", btn_unlock: "Desbloquear", ph_streamer: "Nombre del Streamer", btn_search: "🔍 Buscar (Live & VODs)", status_ready: "Listo.", lbl_quality: "Calidad:", btn_pip: "📺 Modo PiP", btn_dl: "📥 Descargar", lbl_link: "Enlace externo:", btn_copy: "Copiar", err_missing: "Falta el nombre.", loading: "Buscando a", live_on: "EN VIVO", btn_watch_live: "▶️ Ver Directo", no_vod: "No se encontraron VODs.", vods_found: "VODs encontrados.", err_network: "Error de red.", err_live: "Error de directo.", loading_vod: "Cargando VOD...", vod_ready: "VOD Listo!", err_conn: "Error de conexión.", copied: "Enlace copiado!", offline: "DESCONECTADO", offline_since: "Desconectado desde: ", day: "d", hour: "h", min: "min" }
         };
 
         let currentLang = 'fr';
         let currentLinks = {};
         let hls = null;
         let player = null;
-        let currentMode = 'channel';
-
-        // Elements
-        const el = {
-            status: document.getElementById('status-msg'),
-            vodList: document.getElementById('vod-list'),
-            videoContainer: document.getElementById('video-container'),
-            optionsBar: document.getElementById('options-bar'),
-            qualitySelect: document.getElementById('qualitySelect'),
-            vlcInput: document.getElementById('vlcLink'),
-            liveHeader: document.getElementById('liveHeader'),
-            searchInput: document.getElementById('searchInput'),
-            tabChannel: document.getElementById('tab-channel'),
-            tabDirect: document.getElementById('tab-direct')
-        };
+        
+        const elements = { status: document.getElementById('status-msg'), vodList: document.getElementById('vod-list'), videoContainer: document.getElementById('video-container'), optionsBar: document.getElementById('options-bar'), vlcSection: document.getElementById('vlc-section'), qualitySelect: document.getElementById('qualitySelect'), vlcInput: document.getElementById('vlcLink'), liveArea: document.getElementById('live-area'), langSelect: document.getElementById('langSelect') };
 
         document.addEventListener('DOMContentLoaded', () => {
             const userLang = navigator.language.slice(0, 2);
-            setLanguage(translations[userLang] ? userLang : 'fr');
+            if (translations[userLang]) setLanguage(userLang); else setLanguage('fr');
+            player = new Plyr('#player', { controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'airplay', 'fullscreen'], settings: ['speed'] });
             
-            player = new Plyr('#player', {
-                controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'fullscreen'],
-                settings: ['speed']
-            });
-
             const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('id')) { 
-                el.searchInput.value = urlParams.get('id'); 
-                switchMode('direct'); 
-                doSearch(); 
-            } else if (urlParams.get('channel')) { 
-                el.searchInput.value = urlParams.get('channel'); 
-                switchMode('channel'); 
-                doSearch(); 
-            } else {
-                switchMode('channel');
-            }
-
-            if (/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                document.querySelectorAll('.mobile-only').forEach(e => e.style.display = 'inline-block');
-                document.getElementById('mobile-alert').style.display = 'block';
-            }
+            if (urlParams.get('id')) { document.getElementById('vodInput').value = urlParams.get('id'); switchTab('direct'); searchVodById(); }
+            else if (urlParams.get('channel')) { document.getElementById('channelInput').value = urlParams.get('channel'); switchTab('channel'); searchStreamer(true); }
+            if (/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)) document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
         });
 
         function setLanguage(lang) {
             currentLang = lang;
-            document.getElementById('langSelect').value = lang;
-            document.querySelectorAll('[data-lang]').forEach(e => {
-                const k = e.getAttribute('data-lang');
-                if (translations[lang][k]) e.textContent = translations[lang][k];
-            });
-            el.searchInput.placeholder = lang === 'fr' ? "Rechercher Streamer..." : "Search Streamer...";
+            const t = translations[lang];
+            if (elements.langSelect) elements.langSelect.value = lang;
+            document.querySelectorAll('[data-lang]').forEach(el => { const key = el.getAttribute('data-lang'); if (t[key]) el.textContent = t[key]; });
+            document.querySelectorAll('[data-placeholder]').forEach(el => { const key = el.getAttribute('data-placeholder'); if (t[key]) el.placeholder = t[key]; });
         }
-        function txt(k) { return translations[currentLang][k] || k; }
-        function setStatus(msg, type) { 
-            el.status.textContent = translations[currentLang][msg] || msg; 
-            el.status.className = type ? 'status-' + type : ''; 
-        }
-
-        function switchMode(mode) {
-            currentMode = mode;
-            el.tabChannel.classList.toggle('active', mode === 'channel');
-            el.tabDirect.classList.toggle('active', mode === 'direct');
-            el.searchInput.placeholder = mode === 'channel' ? (currentLang==='fr'?"Nom du Streamer":"Streamer Name") : (currentLang==='fr'?"ID de la VOD":"VOD ID");
-            el.vodList.style.display = 'none';
-            el.liveHeader.style.display = 'none';
+        function txt(key) { return translations[currentLang][key] || key; }
+        function setStatus(msgKey, type) { elements.status.textContent = translations[currentLang][msgKey] || msgKey; elements.status.className = type ? 'status-' + type : ''; }
+        
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            if (tab === 'direct') { document.querySelector('.tab-btn:nth-child(1)').classList.add('active'); document.getElementById('tab-direct').classList.add('active'); elements.vodList.style.display = 'none'; }
+            else { document.querySelector('.tab-btn:nth-child(2)').classList.add('active'); document.getElementById('tab-channel').classList.add('active'); if (elements.vodList.children.length > 0) elements.vodList.style.display = 'grid'; }
         }
 
-        function doSearch() {
-            const val = el.searchInput.value.trim();
-            if (!val) return;
-            if (currentMode === 'channel') searchStreamer(val);
-            else searchVodById(val);
+        // FONCTION POUR CALCULER LE TEMPS ECOULÉ
+        function getTimeSince(dateString, durationSeconds) {
+            const endDate = new Date(new Date(dateString).getTime() + durationSeconds * 1000);
+            const now = new Date();
+            const diff = now - endDate;
+
+            if (diff < 0) return ""; 
+
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+
+            if (days > 0) return `${days} ${txt('day')}`;
+            if (hours > 0) return `${hours} ${txt('hour')}`;
+            return `${minutes} ${txt('min')}`;
         }
 
-        // --- LOGIQUE CHAÎNE ---
-        async function searchStreamer(name) {
+        async function searchStreamer(autoPlay = false) {
+            const channelName = document.getElementById('channelInput').value.trim();
+            if (!channelName) return setStatus("err_missing", 'error');
             setStatus("loading", 'loading');
-            el.vodList.style.display = 'none';
-            el.liveHeader.style.display = 'none';
+            elements.vodList.style.display = 'none';
+            elements.liveArea.innerHTML = '';
             hidePlayer();
 
-            const pVods = fetch(`${API_URL}/api/get-channel-videos?name=${name}`);
-            const pLive = fetch(`${API_URL}/api/get-live?name=${name}`);
+            const pVods = fetch(`${API_URL}/api/get-channel-videos?name=${channelName}`);
+            const pLive = fetch(`${API_URL}/api/get-live?name=${channelName}`);
 
             try {
                 const [resVods, resLive] = await Promise.all([pVods, pLive]);
                 const dataLive = await resLive.json();
                 const dataVods = await resVods.json();
 
-                const avatar = dataLive.avatar || dataVods.avatar || "https://static-cdn.jtvnw.net/user-default-pictures-uv/cdd517fe-def4-11e9-948e-784f43822e80-profile_image-70x70.png";
-                
-                // HEADER INFO
-                el.liveHeader.style.display = 'flex';
-                let html = '';
+                const avatarUrl = dataLive.avatar || dataVods.avatar || "https://static-cdn.jtvnw.net/user-default-pictures-uv/cdd517fe-def4-11e9-948e-784f43822e80-profile_image-70x70.png";
                 
                 if (!dataLive.error) {
-                    // LIVE ON
-                    html = `
-                        <img src="${avatar}" class="live-avatar online">
-                        <div class="live-meta">
-                            <div class="live-user">${name} <span class="live-badge">${txt('live_on')}</span></div>
-                            <div class="live-title">${dataLive.title}</div>
-                            <div class="live-game">${dataLive.game}</div>
-                            <button class="btn-primary" style="margin-top:8px" onclick="watchLive('${name}')">${txt('btn_watch_live')}</button>
-                        </div>
-                        ${dataLive.thumbnail ? `<img src="${dataLive.thumbnail.replace('{width}','320').replace('{height}','180')}" class="live-preview">` : ''}
-                    `;
-                } else {
-                    // OFFLINE
-                    let lastInfo = "";
-                    if (!dataVods.error && dataVods.videos && dataVods.videos.length > 0) {
-                        const lastDate = new Date(dataVods.videos[0].publishedAt).toLocaleDateString();
-                        const timeSince = getTimeSince(dataVods.videos[0].publishedAt, dataVods.videos[0].lengthSeconds);
-                        lastInfo = `<div style="font-size:0.85rem; color:#888; margin-top:4px;">${txt('last_live')} ${lastDate} (${timeSince})</div>`;
-                    }
-                    html = `
-                        <img src="${avatar}" class="live-avatar">
-                        <div class="live-meta">
-                            <div class="live-user">${name} <span class="offline-badge">${txt('offline')}</span></div>
-                            <div class="live-title" style="color:#777">${txt('offline_msg')}</div>
-                            ${lastInfo}
-                        </div>
-                    `;
-                }
-                el.liveHeader.innerHTML = html;
-                setStatus("");
-
-                // VOD LIST
-                if (!dataVods.error) {
-                    el.vodList.innerHTML = '';
-                    el.vodList.style.display = 'grid';
-                    dataVods.videos.forEach(vod => {
-                        const div = document.createElement('div');
-                        div.className = 'vod-card';
-                        div.onclick = () => { el.searchInput.value = vod.id; switchMode('direct'); searchVodById(vod.id); };
-                        
-                        const date = new Date(vod.publishedAt).toLocaleDateString();
-                        const dur = Math.floor(vod.lengthSeconds / 60) + ' min';
-                        
-                        div.innerHTML = `
-                            <div class="vod-thumb-box">
-                                <img src="${vod.previewThumbnailURL}" class="vod-thumb-img">
-                                <div class="vod-duration">${dur}</div>
+                    const thumbUrl = dataLive.thumbnail ? dataLive.thumbnail.replace('{width}', '320').replace('{height}', '180') : "";
+                    
+                    elements.liveArea.innerHTML = `
+                        <div class="live-card online">
+                            <img src="${avatarUrl}" class="live-avatar">
+                            <div class="live-info">
+                                <span class="live-badge">${txt('live_on')}</span>
+                                <div class="live-title">${dataLive.title}</div>
+                                <div class="live-game">${dataLive.game}</div>
+                                <button class="btn-primary" style="margin-top:10px; width:100%" onclick="watchLive()">${txt('btn_watch_live')}</button>
                             </div>
-                            <div class="vod-title">${vod.title}</div>
-                            <div class="vod-date">${date}</div>
-                        `;
-                        el.vodList.appendChild(div);
-                    });
+                            ${thumbUrl ? `<div class="live-thumb-container"><img src="${thumbUrl}" class="live-thumb"></div>` : ''}
+                        </div>`;
+                    if (autoPlay) watchLive();
                 } else {
-                    setStatus("no_vod", 'error');
+                    // CALCUL ET AFFICHAGE DU "HORS LIGNE DEPUIS"
+                    let offlineText = txt('offline_msg'); // Message par défaut
+                    
+                    if (!dataVods.error && dataVods.videos && dataVods.videos.length > 0) {
+                        const lastVod = dataVods.videos[0];
+                        const timeSinceStr = getTimeSince(lastVod.publishedAt, lastVod.lengthSeconds);
+                        if (timeSinceStr) {
+                            offlineText = `<span style="color:#e91916; font-weight:700;">${txt('offline_since')} ${timeSinceStr}</span>`;
+                        }
+                    }
+
+                    elements.liveArea.innerHTML = `
+                        <div class="live-card">
+                            <img src="${avatarUrl}" class="live-avatar" style="border-color:#555">
+                            <div class="live-info">
+                                <span class="live-badge" style="background:#555">${txt('offline')}</span>
+                                <div class="live-title" style="color:#aaa; margin-top:5px;">${offlineText}</div>
+                            </div>
+                        </div>`;
                 }
 
+                if (dataVods.error) {
+                    setStatus("no_vod", 'error');
+                } else {
+                    setStatus("vods_found", 'success');
+                    elements.vodList.innerHTML = '';
+                    elements.vodList.style.display = 'grid';
+                    dataVods.videos.forEach(vod => {
+                        const card = document.createElement('div');
+                        card.className = 'vod-card';
+                        card.onclick = () => loadVodFromCard(vod.id);
+                        const duration = Math.floor(vod.lengthSeconds / 60) + ' min';
+                        const date = new Date(vod.publishedAt).toLocaleDateString(currentLang === 'fr' ? 'fr-FR' : 'en-US');
+                        card.innerHTML = `<img src="${vod.previewThumbnailURL}" class="vod-thumb"><div class="vod-info"><div class="vod-title">${vod.title}</div><div class="vod-meta">${date} • ${duration}</div></div>`;
+                        elements.vodList.appendChild(card);
+                    });
+                }
             } catch (e) { setStatus("err_network", 'error'); }
         }
 
-        async function watchLive(name) {
+        async function watchLive() {
+            const channelName = document.getElementById('channelInput').value.trim();
             try {
-                const res = await fetch(`${API_URL}/api/get-live?name=${name}`);
-                const data = await res.json();
-                if (data.error) return setStatus("offline_msg", 'error');
-                setupPlayer(data.links);
-            } catch (e) { setStatus("err_network", 'error'); }
-        }
-
-        async function searchVodById(id) {
-            const cleanId = (id.match(/\d{8,}/) || [])[0];
-            if (!cleanId) return setStatus("ID Invalide", 'error');
-            
-            setStatus("loading", 'loading');
-            hidePlayer();
-            
-            try {
-                const res = await fetch(`${API_URL}/api/get-m3u8?id=${cleanId}`);
-                const data = await res.json();
+                const response = await fetch(`${API_URL}/api/get-live?name=${channelName}`);
+                const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
                 setupPlayer(data.links);
-                setStatus("");
-            } catch (e) { setStatus("err_network", 'error'); }
+                setStatus(data.title, 'success');
+            } catch (e) { setStatus("err_live", 'error'); }
+        }
+
+        function loadVodFromCard(id) { document.getElementById('vodInput').value = id; switchTab('direct'); searchVodById(); }
+        async function searchVodById() {
+            const id = (document.getElementById('vodInput').value.match(/\d{8,}/) || [])[0];
+            if (!id) return setStatus("ID invalide", 'error');
+            setStatus("loading", 'loading'); hidePlayer();
+            try {
+                const response = await fetch(`${API_URL}/api/get-m3u8?id=${id}`);
+                const data = await response.json();
+                if (data.error) return setStatus(data.error, 'error');
+                setupPlayer(data.links); setStatus("vod_ready", 'success');
+            } catch (e) { setStatus("err_conn", 'error'); }
         }
 
         function setupPlayer(links) {
-            currentLinks = links;
-            el.qualitySelect.innerHTML = '';
-            for (const [q, url] of Object.entries(links)) {
-                const opt = document.createElement('option');
-                opt.value = q;
-                opt.textContent = q;
-                el.qualitySelect.appendChild(opt);
-            }
-            el.videoContainer.style.display = 'block';
-            el.optionsBar.style.display = 'flex';
-            el.liveHeader.style.display = 'none'; // On cache le header quand on regarde
-            changeQuality();
+            currentLinks = links; elements.qualitySelect.innerHTML = '';
+            for (const [q, url] of Object.entries(links)) { const opt = document.createElement('option'); opt.value = q; opt.textContent = q.toUpperCase().replace('CHUNKED', 'SOURCE'); elements.qualitySelect.appendChild(opt); }
+            elements.optionsBar.style.display = 'flex'; elements.videoContainer.style.display = 'block'; elements.vlcSection.style.display = 'flex'; changeQuality();
         }
 
         function changeQuality() {
-            const url = currentLinks[el.qualitySelect.value];
-            if (!url) return;
-            el.vlcInput.value = url;
-            
-            if (Hls.isSupported()) {
-                if (hls) hls.destroy();
-                hls = new Hls();
-                hls.loadSource(url);
-                hls.attachMedia(document.getElementById('player'));
-                hls.on(Hls.Events.MANIFEST_PARSED, () => player.play().catch(()=>{}));
-            } else if (document.getElementById('player').canPlayType('application/vnd.apple.mpegurl')) {
-                document.getElementById('player').src = url;
-                player.play();
-            }
+            const rawUrl = currentLinks[elements.qualitySelect.value]; if (!rawUrl) return;
+            elements.vlcInput.value = rawUrl; const video = document.getElementById('player');
+            if (Hls.isSupported()) { if (hls) hls.destroy(); hls = new Hls(); hls.loadSource(rawUrl); hls.attachMedia(video); hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(()=>{})); }
+            else if (video.canPlayType('application/vnd.apple.mpegurl')) { video.src = rawUrl; video.play(); }
         }
 
-        function hidePlayer() {
-            el.videoContainer.style.display = 'none';
-            el.optionsBar.style.display = 'none';
-            if (hls) hls.destroy();
-            player.stop();
-        }
-
-        function getTimeSince(dateStr, durSec) {
-            const end = new Date(new Date(dateStr).getTime() + durSec * 1000);
-            const diff = new Date() - end;
-            if (diff < 0) return "";
-            const days = Math.floor(diff / 86400000);
-            const hours = Math.floor(diff / 3600000);
-            return days > 0 ? `${days}j` : `${hours}h`;
-        }
-
-        function togglePiP() { 
-            const v = document.getElementById('player');
-            if (document.pictureInPictureElement) document.exitPictureInPicture();
-            else if (document.pictureInPictureEnabled) v.requestPictureInPicture();
-        }
-        function downloadM3U8() {
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob([`#EXTM3U\n#EXTINF:-1,Twitch\n${el.vlcInput.value}`],{type:'audio/x-mpegurl'}));
-            a.download = 'video.m3u'; a.click();
-        }
-        function copyLink() {
-            el.vlcInput.select(); navigator.clipboard.writeText(el.vlcInput.value);
-            alert("Lien copié !");
-        }
-        function openInVLC_Mobile() { window.location.href = 'vlc://' + el.vlcInput.value; }
-        function openInOutplayer() { window.location.href = 'outplayer://' + el.vlcInput.value; }
-
+        function hidePlayer() { elements.optionsBar.style.display = 'none'; elements.videoContainer.style.display = 'none'; elements.vlcSection.style.display = 'none'; if (hls) hls.destroy(); player.stop(); }
+        function togglePiP() { const v = document.getElementById('player'); if (document.pictureInPictureEnabled) document.pictureInPictureElement ? document.exitPictureInPicture() : v.requestPictureInPicture(); }
+        function downloadM3U8() { const l = document.createElement('a'); l.href = URL.createObjectURL(new Blob([`#EXTM3U\n#EXTINF:-1,Twitch\n${elements.vlcInput.value}`],{type:'audio/x-mpegurl'})); l.download='video.m3u'; l.click(); }
+        function copyLink() { elements.vlcInput.select(); navigator.clipboard.writeText(elements.vlcInput.value); alert(txt('copied')); }
+        function openInVLC_Mobile() { window.location.href = 'vlc://' + elements.vlcInput.value; }
+        function openInOutplayer() { window.location.href = 'outplayer://' + elements.vlcInput.value; }
     </script>
 </body>
 </html>
