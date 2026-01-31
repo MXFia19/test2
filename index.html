@@ -159,8 +159,7 @@
                 <button class="btn-primary" onclick="searchStreamer()" data-lang="btn_search">🔍 Chercher (Live & VODs)</button>
             </div>
             <div id="live-area"></div>
-            <div id="vod-list"></div>
-        </div>
+            </div>
 
         <div id="status-msg" data-lang="status_ready">Prêt.</div>
 
@@ -184,6 +183,8 @@
                 <button class="btn-secondary mobile-only" style="background:var(--vlc)" onclick="openInVLC_Mobile()">VLC App</button>
             </div>
         </div>
+
+        <div id="vod-list"></div>
     </div>
 
     <script>
@@ -284,7 +285,7 @@
             }
         };
 
-        let currentLang = 'fr';
+        let currentLang = 'fr'; // Langue par défaut
         let currentLinks = {};
         let hls = null;
         let player = null;
