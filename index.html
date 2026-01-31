@@ -6,8 +6,8 @@
     <title>Twitch VOD Unblocker</title>
     
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="https://cdn.plyr.io/3.8.4/plyr.js"></script>
-    <link rel="stylesheet" href="https://cdn.plyr.io/3.8.4/plyr.css" />
+    <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     
    <style>
@@ -27,35 +27,15 @@
             padding-top: 50px; 
         }
 
-        /* --- LE PETIT MENU DÉGUISÉ EN BOUTON --- */
         #langSelect {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: #26262c; 
-            border: 1px solid #3a3a40; 
-            color: #888;
-            padding: 5px 10px; 
-            border-radius: 6px; 
-            cursor: pointer; 
-            font-size: 0.75rem; 
-            font-weight: 700; 
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.2s;
-            z-index: 10;
-            appearance: none; 
-            -webkit-appearance: none; 
-            -moz-appearance: none;
-            text-align: center;
-            width: auto;
+            position: absolute; top: 15px; right: 15px;
+            background: #26262c; border: 1px solid #3a3a40; color: #888;
+            padding: 5px 10px; border-radius: 6px; cursor: pointer; 
+            font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 1px; transition: all 0.2s; z-index: 10;
+            appearance: none; -webkit-appearance: none; -moz-appearance: none; text-align: center; width: auto;
         }
-        #langSelect:hover { 
-            background: #3a3a40; 
-            color: white; 
-            border-color: var(--primary); 
-            transform: scale(1.05);
-        }
+        #langSelect:hover { background: #3a3a40; color: white; border-color: var(--primary); transform: scale(1.05); }
         #langSelect:focus { outline: none; border-color: var(--primary); }
 
         h1 { font-weight: 800; margin-bottom: 20px; color: #bf94ff; font-size: 1.5rem; margin-top: 0; }
@@ -188,104 +168,17 @@
     </div>
 
     <script>
-        // --- CONFIGURATION ---
+        // --- CONFIGURATION CLOUDFLARE ---
+        const API_URL = "https://twitch-proxy.kurzmathis4.workers.dev"; // C'est votre nouveau moteur !
+
+        // --- TRADUCTIONS ---
         const translations = {
-            fr: {
-                title: "Regarder Twitch sans Sub",
-                tab_id: "Lien / ID",
-                tab_streamer: "Streamer",
-                mobile_title: "📱 Mode Mobile",
-                mobile_desc: "Astuce : utilisez Outplayer ou VLC.",
-                ph_id: "ID ou Lien de la VOD",
-                btn_unlock: "Déverrouiller",
-                ph_streamer: "Nom du Streamer",
-                btn_search: "🔍 Chercher (Live & VODs)",
-                status_ready: "Prêt.",
-                lbl_quality: "Qualité :",
-                btn_pip: "📺 Activer PiP",
-                btn_dl: "📥 Télécharger (Fichier)",
-                lbl_link: "Lien externe :",
-                btn_copy: "Copier",
-                err_missing: "Nom manquant.",
-                loading: "Recherche de",
-                live_on: "🔴 EN DIRECT !",
-                btn_watch_live: "▶️ Regarder le Live",
-                live_msg_vod: "En live (mais pas de VODs).",
-                no_vod: "Aucune VOD trouvée.",
-                vods_found: "VODs trouvées.",
-                err_network: "Erreur réseau.",
-                err_live: "Erreur Live.",
-                loading_vod: "Chargement VOD...",
-                vod_ready: "VOD Prête !",
-                err_conn: "Erreur connexion.",
-                copied: "Lien copié !",
-                live_plays: "Joue à : "
-            },
-            en: {
-                title: "Watch Twitch No Sub",
-                tab_id: "Link / ID",
-                tab_streamer: "Streamer",
-                mobile_title: "📱 Mobile Mode",
-                mobile_desc: "Tip: use Outplayer or VLC app.",
-                ph_id: "VOD ID or Link",
-                btn_unlock: "Unlock",
-                ph_streamer: "Streamer Name",
-                btn_search: "🔍 Search (Live & VODs)",
-                status_ready: "Ready.",
-                lbl_quality: "Quality:",
-                btn_pip: "📺 Toggle PiP",
-                btn_dl: "📥 Download (File)",
-                lbl_link: "External Link:",
-                btn_copy: "Copy",
-                err_missing: "Name missing.",
-                loading: "Searching for",
-                live_on: "🔴 LIVE NOW!",
-                btn_watch_live: "▶️ Watch Live",
-                live_msg_vod: "Live is on (but no VODs).",
-                no_vod: "No VODs found.",
-                vods_found: "VODs found.",
-                err_network: "Network error.",
-                err_live: "Live error.",
-                loading_vod: "Loading VOD...",
-                vod_ready: "VOD Ready!",
-                err_conn: "Connection error.",
-                copied: "Link copied!",
-                live_plays: "Playing: "
-            },
-            es: {
-                title: "Ver Twitch sin Sub",
-                tab_id: "Enlace / ID",
-                tab_streamer: "Streamer",
-                mobile_title: "📱 Modo Móvil",
-                mobile_desc: "Consejo: usa Outplayer o VLC.",
-                ph_id: "ID o Enlace VOD",
-                btn_unlock: "Desbloquear",
-                ph_streamer: "Nombre del Streamer",
-                btn_search: "🔍 Buscar (Live & VODs)",
-                status_ready: "Listo.",
-                lbl_quality: "Calidad:",
-                btn_pip: "📺 Modo PiP",
-                btn_dl: "📥 Descargar",
-                lbl_link: "Enlace externo:",
-                btn_copy: "Copiar",
-                err_missing: "Falta el nombre.",
-                loading: "Buscando a",
-                live_on: "🔴 EN VIVO!",
-                btn_watch_live: "▶️ Ver Directo",
-                live_msg_vod: "En vivo (sin VODs).",
-                no_vod: "No se encontraron VODs.",
-                vods_found: "VODs encontrados.",
-                err_network: "Error de red.",
-                err_live: "Error de directo.",
-                loading_vod: "Cargando VOD...",
-                vod_ready: "VOD Listo!",
-                err_conn: "Error de conexión.",
-                copied: "Enlace copiado!",
-                live_plays: "Jugando a: "
-            }
+            fr: { title: "Regarder Twitch sans Sub", tab_id: "Lien / ID", tab_streamer: "Streamer", mobile_title: "📱 Mode Mobile", mobile_desc: "Astuce : utilisez Outplayer ou VLC.", ph_id: "ID ou Lien de la VOD", btn_unlock: "Déverrouiller", ph_streamer: "Nom du Streamer", btn_search: "🔍 Chercher (Live & VODs)", status_ready: "Prêt.", lbl_quality: "Qualité :", btn_pip: "📺 Activer PiP", btn_dl: "📥 Télécharger (Fichier)", lbl_link: "Lien externe :", btn_copy: "Copier", err_missing: "Nom manquant.", loading: "Recherche de", live_on: "🔴 EN DIRECT !", btn_watch_live: "▶️ Regarder le Live", live_msg_vod: "En live (mais pas de VODs).", no_vod: "Aucune VOD trouvée.", vods_found: "VODs trouvées.", err_network: "Erreur réseau.", err_live: "Erreur Live.", loading_vod: "Chargement VOD...", vod_ready: "VOD Prête !", err_conn: "Erreur connexion.", copied: "Lien copié !", live_plays: "Joue à : " },
+            en: { title: "Watch Twitch No Sub", tab_id: "Link / ID", tab_streamer: "Streamer", mobile_title: "📱 Mobile Mode", mobile_desc: "Tip: use Outplayer or VLC app.", ph_id: "VOD ID or Link", btn_unlock: "Unlock", ph_streamer: "Streamer Name", btn_search: "🔍 Search (Live & VODs)", status_ready: "Ready.", lbl_quality: "Quality:", btn_pip: "📺 Toggle PiP", btn_dl: "📥 Download (File)", lbl_link: "External Link:", btn_copy: "Copy", err_missing: "Name missing.", loading: "Searching for", live_on: "🔴 LIVE NOW!", btn_watch_live: "▶️ Watch Live", live_msg_vod: "Live is on (but no VODs).", no_vod: "No VODs found.", vods_found: "VODs found.", err_network: "Network error.", err_live: "Live error.", loading_vod: "Loading VOD...", vod_ready: "VOD Ready!", err_conn: "Connection error.", copied: "Link copied!", live_plays: "Playing: " },
+            es: { title: "Ver Twitch sin Sub", tab_id: "Enlace / ID", tab_streamer: "Streamer", mobile_title: "📱 Modo Móvil", mobile_desc: "Consejo: usa Outplayer o VLC.", ph_id: "ID o Enlace VOD", btn_unlock: "Desbloquear", ph_streamer: "Nombre del Streamer", btn_search: "🔍 Buscar (Live & VODs)", status_ready: "Listo.", lbl_quality: "Calidad:", btn_pip: "📺 Modo PiP", btn_dl: "📥 Descargar", lbl_link: "Enlace externo:", btn_copy: "Copiar", err_missing: "Falta el nombre.", loading: "Buscando a", live_on: "🔴 EN VIVO!", btn_watch_live: "▶️ Ver Directo", live_msg_vod: "En vivo (sin VODs).", no_vod: "No se encontraron VODs.", vods_found: "VODs encontrados.", err_network: "Error de red.", err_live: "Error de directo.", loading_vod: "Cargando VOD...", vod_ready: "VOD Listo!", err_conn: "Error de conexión.", copied: "Enlace copiado!", live_plays: "Jugando a: " }
         };
 
-        let currentLang = 'fr'; // Langue par défaut
+        let currentLang = 'fr';
         let currentLinks = {};
         let hls = null;
         let player = null;
@@ -302,23 +195,15 @@
             langSelect: document.getElementById('langSelect')
         };
 
-        // --- DÉMARRAGE ---
         document.addEventListener('DOMContentLoaded', () => {
-            // 1. Détection Langue
             const userLang = navigator.language.slice(0, 2);
-            if (translations[userLang]) {
-                setLanguage(userLang);
-            } else {
-                setLanguage('fr');
-            }
+            if (translations[userLang]) setLanguage(userLang); else setLanguage('fr');
 
-            // 2. Player
             player = new Plyr('#player', {
                 controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'airplay', 'fullscreen'],
                 settings: ['speed']
             });
 
-            // 3. Gestion URL (ID ou Chaîne)
             const urlParams = new URLSearchParams(window.location.search);
             const idFromUrl = urlParams.get('id');
             const channelFromUrl = urlParams.get('channel');
@@ -330,37 +215,23 @@
             } else if (channelFromUrl) {
                 document.getElementById('channelInput').value = channelFromUrl;
                 switchTab('channel');
-                // ON LANCE LA RECHERCHE EN MODE AUTO-PLAY (true)
                 searchStreamer(true);
             }
 
-            // 4. Mobile Check
             if (/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
                 document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
             }
         });
 
-        // --- FONCTIONS ---
         function setLanguage(lang) {
             currentLang = lang;
             const t = translations[lang];
-            
             if (elements.langSelect) elements.langSelect.value = lang;
-
-            document.querySelectorAll('[data-lang]').forEach(el => {
-                const key = el.getAttribute('data-lang');
-                if (t[key]) el.textContent = t[key];
-            });
-
-            document.querySelectorAll('[data-placeholder]').forEach(el => {
-                const key = el.getAttribute('data-placeholder');
-                if (t[key]) el.placeholder = t[key];
-            });
+            document.querySelectorAll('[data-lang]').forEach(el => { const key = el.getAttribute('data-lang'); if (t[key]) el.textContent = t[key]; });
+            document.querySelectorAll('[data-placeholder]').forEach(el => { const key = el.getAttribute('data-placeholder'); if (t[key]) el.placeholder = t[key]; });
         }
 
-        function txt(key) {
-            return translations[currentLang][key] || key;
-        }
+        function txt(key) { return translations[currentLang][key] || key; }
 
         function setStatus(msgKey, type, extra = "") {
             const text = translations[currentLang][msgKey] ? translations[currentLang][msgKey] : msgKey;
@@ -371,7 +242,6 @@
         function switchTab(tab) {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            
             if (tab === 'direct') {
                 document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
                 document.getElementById('tab-direct').classList.add('active');
@@ -379,13 +249,10 @@
             } else {
                 document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
                 document.getElementById('tab-channel').classList.add('active');
-                if (elements.vodList && elements.vodList.children.length > 0) {
-                    elements.vodList.style.display = 'grid';
-                }
+                if (elements.vodList && elements.vodList.children.length > 0) elements.vodList.style.display = 'grid';
             }
         }
 
-        // --- MODIFIÉ : ACCEPTE MAINTENANT UN PARAMÈTRE AUTO-PLAY ---
         async function searchStreamer(autoPlay = false) {
             const channelName = document.getElementById('channelInput').value.trim();
             if (!channelName) return setStatus("err_missing", 'error');
@@ -395,8 +262,9 @@
             elements.liveArea.innerHTML = '';
             hidePlayer();
 
-            const pVods = fetch(`/api/get-channel-videos?name=${channelName}`);
-            const pLive = fetch(`/api/get-live?name=${channelName}`);
+            // MODIFICATION CLOUDFLARE : ON UTILISE API_URL
+            const pVods = fetch(`${API_URL}/api/get-channel-videos?name=${channelName}`);
+            const pLive = fetch(`${API_URL}/api/get-live?name=${channelName}`);
 
             try {
                 const [resVods, resLive] = await Promise.all([pVods, pLive]);
@@ -404,19 +272,13 @@
 
                 if (!dataLive.error) {
                     const gameInfo = dataLive.game ? `[${txt('live_plays')} ${dataLive.game}]` : "";
-                    
-                    // Affiche le panneau
                     elements.liveArea.innerHTML = `
                         <div style="background: rgba(233, 25, 22, 0.15); border: 2px solid #e91916; padding: 15px; border-radius: 12px; margin-bottom: 25px; animation: fadeIn 0.5s;">
                             <h3 style="color: #ff4f4d; margin-bottom: 8px;">${txt('live_on')}</h3>
                             <p>${dataLive.title}<br><span style="color:#bbb; font-size:0.9rem;">${gameInfo}</span></p>
                             <button class="btn-primary" style="background-color: #e91916; width: 100%; margin-top:10px;" onclick="watchLive()">${txt('btn_watch_live')}</button>
                         </div>`;
-                    
-                    // SI AUTO-PLAY EST ACTIVÉ, ON LANCE LE LIVE DIRECTEMENT
-                    if (autoPlay) {
-                        watchLive();
-                    }
+                    if (autoPlay) watchLive();
                 }
 
                 const dataVods = await resVods.json();
@@ -443,13 +305,10 @@
         async function watchLive() {
             const channelName = document.getElementById('channelInput').value.trim();
             try {
-                // NOTE : On ne cache plus vodList ici pour qu'elle reste visible en bas !
-                // elements.vodList.style.display = 'none'; <--- RETIRÉ
-                
-                const response = await fetch(`/api/get-live?name=${channelName}`);
+                // MODIFICATION CLOUDFLARE
+                const response = await fetch(`${API_URL}/api/get-live?name=${channelName}`);
                 const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
-
                 setupPlayer(data.links);
                 setStatus(`🔴 ${data.title}`, 'success');
             } catch (e) { setStatus("err_live", 'error'); }
@@ -468,10 +327,10 @@
             hidePlayer();
 
             try {
-                const response = await fetch(`/api/get-m3u8?id=${id}`);
+                // MODIFICATION CLOUDFLARE
+                const response = await fetch(`${API_URL}/api/get-m3u8?id=${id}`);
                 const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
-
                 setupPlayer(data.links);
                 setStatus("vod_ready", 'success');
             } catch (e) { setStatus("err_conn", 'error'); }
@@ -495,7 +354,8 @@
         function changeQuality() {
             const rawUrl = currentLinks[elements.qualitySelect.value];
             if (!rawUrl) return;
-            const proxyUrl = `/api/proxy?url=${encodeURIComponent(rawUrl)}`;
+            // MODIFICATION CLOUDFLARE : On utilise le proxy Cloudflare
+            const proxyUrl = `${API_URL}/api/proxy?url=${encodeURIComponent(rawUrl)}`;
             elements.vlcInput.value = rawUrl;
             
             const video = document.getElementById('player');
@@ -548,4 +408,3 @@
     </script>
 </body>
 </html>
-
