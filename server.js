@@ -156,25 +156,40 @@ app.get('/api/proxy', async (req, res) => {
     if (!targetUrl) return res.status(400).send('URL manquante');
 
     try {
+        // Si c'est un fichier playlist (.m3u8), on le traite
         if (targetUrl.includes('.m3u8')) {
             const response = await axios.get(targetUrl, { headers: AXIOS_CONFIG.headers, responseType: 'text' });
             const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
+            
             const newContent = response.data.split('\n').map(line => {
                 const l = line.trim();
                 if (!l || l.startsWith('#')) return l; 
+                
                 const fullLink = l.startsWith('http') ? l : baseUrl + l;
-                return `/api/proxy?url=${encodeURIComponent(fullLink)}`;
+
+                // MODIFICATION ICI : 
+                // On ne passe par le proxy QUE si c'est une autre playlist (.m3u8).
+                // Si c'est un segment vidéo (.ts), on laisse le lien direct vers Twitch.
+                if (l.includes('.m3u8')) {
+                    return `/api/proxy?url=${encodeURIComponent(fullLink)}`;
+                } else {
+                    return fullLink; // Lien direct = Pas de consommation Vercel
+                }
             }).join('\n');
+
             res.set('Access-Control-Allow-Origin', '*');
             res.set('Content-Type', 'application/vnd.apple.mpegurl');
             return res.send(newContent);
         }
+
+        // Si on arrive ici pour autre chose qu'un m3u8 (ex: un segment ts qu'on aurait forcé), on proxy
         const response = await axios({
             url: targetUrl, method: 'GET', responseType: 'stream', headers: AXIOS_CONFIG.headers
         });
         res.set('Access-Control-Allow-Origin', '*');
         res.set('Content-Type', response.headers['content-type']);
         response.data.pipe(res);
+
     } catch (e) {
         if (!res.headersSent) res.status(500).send('Erreur proxy');
     }
@@ -241,3 +256,4 @@ app.get('/', (req, res) => {
 
 // --- EXPORT POUR VERCEL ---
 module.exports = app;
+
