@@ -57,6 +57,7 @@
             background: rgba(0,0,0,0.2); border: 1px solid #3a3a40; border-radius: 12px; 
             padding: 15px; margin-bottom: 25px; text-align: left; animation: fadeIn 0.5s;
             display: flex; gap: 15px; flex-wrap: wrap; align-items: center;
+            /* La miniature ira à droite naturellement grâce à l'ordre HTML */
         }
         .live-card.online { border-color: #e91916; background: rgba(233, 25, 22, 0.05); }
         .live-thumb-container { position: relative; width: 180px; aspect-ratio: 16/9; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
@@ -208,15 +209,14 @@
                 const dataLive = await resLive.json();
                 const dataVods = await resVods.json();
 
-                // Gestion de l'avatar : on prend celui du live, sinon celui des VODs
                 const avatarUrl = dataLive.avatar || dataVods.avatar || "https://static-cdn.jtvnw.net/user-default-pictures-uv/cdd517fe-def4-11e9-948e-784f43822e80-profile_image-70x70.png";
                 
                 if (!dataLive.error) {
                     const thumbUrl = dataLive.thumbnail ? dataLive.thumbnail.replace('{width}', '320').replace('{height}', '180') : "";
                     
+                    // MODIFICATION ICI : On met l'Avatar d'abord, les Infos au milieu, et la Miniature à la FIN
                     elements.liveArea.innerHTML = `
                         <div class="live-card online">
-                            ${thumbUrl ? `<div class="live-thumb-container"><img src="${thumbUrl}" class="live-thumb"></div>` : ''}
                             <img src="${avatarUrl}" class="live-avatar">
                             <div class="live-info">
                                 <span class="live-badge">${txt('live_on')}</span>
@@ -224,6 +224,7 @@
                                 <div class="live-game">${dataLive.game}</div>
                                 <button class="btn-primary" style="margin-top:10px; width:100%" onclick="watchLive()">${txt('btn_watch_live')}</button>
                             </div>
+                            ${thumbUrl ? `<div class="live-thumb-container"><img src="${thumbUrl}" class="live-thumb"></div>` : ''}
                         </div>`;
                     if (autoPlay) watchLive();
                 } else {
