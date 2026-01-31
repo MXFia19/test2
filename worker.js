@@ -1,4 +1,4 @@
-// worker.js - CODE CORRIGÉ
+// worker.js - VERSION ULTIME (Anti-Crash + Force Proxy + Storyboard)
 const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 
 const COMMON_HEADERS = {
@@ -10,201 +10,198 @@ const COMMON_HEADERS = {
     'Origin': 'https://www.twitch.tv'
 };
 
+const QUALITY_ORDER = ['chunked', 'source', '1080p60', '1080p30', '720p60', '720p30', '480p30', '360p30', '160p30', 'audio_only'];
+
 export default {
     async fetch(request, env, ctx) {
-        if (request.method === "OPTIONS") {
-            return new Response(null, { headers: COMMON_HEADERS });
-        }
+        if (request.method === "OPTIONS") return new Response(null, { headers: COMMON_HEADERS });
 
         const url = new URL(request.url);
-        const path = url.pathname;
-
+        
         try {
-            if (path === '/') return new Response("Twitch Proxy Worker Running", { headers: COMMON_HEADERS });
-            if (path === '/api/get-live') return handleGetLive(url);
-            if (path === '/api/get-channel-videos') return handleGetVideos(url);
-            if (path === '/api/get-m3u8') return handleGetM3U8(url);
-            if (path === '/api/proxy') return handleProxy(url, request);
+            if (url.pathname === '/') return new Response("Twitch Proxy Worker OK", { headers: COMMON_HEADERS });
+            if (url.pathname === '/api/get-live') return await handleGetLive(url);
+            if (url.pathname === '/api/get-channel-videos') return await handleGetVideos(url);
+            if (url.pathname === '/api/get-m3u8') return await handleGetM3U8(url);
+            if (url.pathname === '/api/proxy') return await handleProxy(url, request);
 
             return new Response("Not Found", { status: 404, headers: COMMON_HEADERS });
         } catch (e) {
-            // En cas d'erreur, on renvoie l'erreur en JSON pour débugger
             return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...COMMON_HEADERS, 'Content-Type': 'application/json' } });
         }
     }
 };
 
-// --- LOGIQUE ---
+// --- HANDLERS ---
 
 async function handleGetVideos(url) {
-    const channelName = url.searchParams.get('name');
+    const name = url.searchParams.get('name');
     const cursor = url.searchParams.get('cursor');
-    if (!channelName) return jsonError("Nom manquant");
+    if (!name) return jsonError("Nom manquant");
 
-    const afterParam = cursor ? `, after: "${cursor}"` : "";
-    const query = `query {
-        user(login: "${channelName}") {
-            videos(first: 20, type: ARCHIVE, sort: TIME${afterParam}) {
-                edges { node { id, title, publishedAt, lengthSeconds, viewCount, previewThumbnailURL(height: 180, width: 320) } }
-                pageInfo { hasNextPage, endCursor }
-            }
-        }
-    }`;
-
-    const data = await twitchGQL(query);
-    const videoData = data.data.user?.videos;
+    const query = `query { user(login: "${name}") { videos(first: 20, type: ARCHIVE, sort: TIME${cursor ? `, after: "${cursor}"` : ""}) { edges { node { id, title, publishedAt, lengthSeconds, viewCount, previewThumbnailURL(height: 180, width: 320) } } pageInfo { hasNextPage, endCursor } } } }`;
     
-    if (!videoData) return jsonError("Aucune vidéo trouvée (ou erreur Twitch)", 404);
-
-    return jsonResponse({
-        videos: videoData.edges.map(edge => edge.node),
-        pagination: videoData.pageInfo
-    });
+    try {
+        const data = await twitchGQL(query);
+        const videos = data.data.user?.videos;
+        if (!videos) return jsonError("Aucune vidéo", 404);
+        return jsonResponse({ videos: videos.edges.map(e => e.node), pagination: videos.pageInfo });
+    } catch (e) { return jsonError(e.message, 500); }
 }
 
 async function handleGetLive(url) {
-    const channelName = url.searchParams.get('name');
-    if (!channelName) return jsonError("Nom manquant");
-    const cleanName = channelName.trim().toLowerCase();
+    const name = url.searchParams.get('name');
+    if (!name) return jsonError("Nom manquant");
+    const login = name.trim().toLowerCase();
 
-    const tokenData = await getLiveAccessToken(cleanName);
-    if (!tokenData) return jsonError("Offline", 404);
+    try {
+        const token = await getAccessToken(login, true);
+        if (!token) return jsonError("Offline", 404);
 
-    const masterUrl = `https://usher.ttvnw.net/api/channel/hls/${cleanName}.m3u8?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&playlist_include_framerate=true&segment_preference=4&sig=${tokenData.signature}&token=${encodeURIComponent(tokenData.value)}`;
+        const masterUrl = `https://usher.ttvnw.net/api/channel/hls/${login}.m3u8?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&playlist_include_framerate=true&segment_preference=4&sig=${token.signature}&token=${encodeURIComponent(token.value)}`;
+        const res = await fetch(masterUrl, { headers: COMMON_HEADERS });
+        if (!res.ok) throw new Error("Stream introuvable");
+        
+        const links = parseM3U8(await res.text(), masterUrl);
+        const meta = await twitchGQL(`query { user(login: "${login}") { broadcastSettings { title, game { displayName } } } }`);
+        const info = meta.data?.user?.broadcastSettings;
 
-    const response = await fetch(masterUrl, { headers: COMMON_HEADERS });
-    const text = await response.text();
-    const links = parseM3U8(text, masterUrl);
-
-    const metaQuery = `query { user(login: "${cleanName}") { broadcastSettings { title, game { displayName } } } }`;
-    const metaData = await twitchGQL(metaQuery);
-    const info = metaData.data?.user?.broadcastSettings;
-
-    return jsonResponse({
-        links: links,
-        best: masterUrl,
-        title: info?.title || "Live",
-        game: info?.game?.displayName || ""
-    });
+        return jsonResponse({ links, best: masterUrl, title: info?.title || "Live", game: info?.game?.displayName || "" });
+    } catch (e) { return jsonError(e.message, 404); }
 }
 
 async function handleGetM3U8(url) {
     const vodId = url.searchParams.get('id');
     if (!vodId) return jsonError("ID manquant");
 
-    const tokenData = await getVodAccessToken(vodId);
-    if (tokenData) {
-        const masterUrl = `https://usher.ttvnw.net/vod/${vodId}.m3u8?nauth=${tokenData.value}&nauthsig=${tokenData.signature}&allow_source=true&player_backend=mediaplayer`;
-        const res = await fetch(masterUrl, { headers: COMMON_HEADERS });
-        if (res.ok) {
-            const text = await res.text();
-            if (text.includes('#EXTM3U')) {
-                return jsonResponse({ links: parseM3U8(text, masterUrl), best: masterUrl });
+    // --- PLAN A : Méthode Officielle ---
+    try {
+        const token = await getAccessToken(vodId, false);
+        if (token) {
+            const masterUrl = `https://usher.ttvnw.net/vod/${vodId}.m3u8?nauth=${token.value}&nauthsig=${token.signature}&allow_source=true&player_backend=mediaplayer`;
+            const res = await fetch(masterUrl, { headers: COMMON_HEADERS });
+            if (res.ok) {
+                return jsonResponse({ links: parseM3U8(await res.text(), masterUrl), best: masterUrl });
             }
         }
+    } catch (e) {
+        // C'EST ICI LA CORRECTION : On ignore l'erreur 500/403 et on passe au Plan B
     }
-    return jsonError("VOD introuvable ou Sub-only", 404);
+
+    // --- PLAN B : Storyboard (Contournement Sub-only) ---
+    try {
+        const data = await twitchGQL(`query { video(id: "${vodId}") { seekPreviewsURL, owner { login } } }`);
+        const seekUrl = data.data?.video?.seekPreviewsURL;
+        
+        if (seekUrl) {
+            const links = await storyboardHack(seekUrl);
+            if (Object.keys(links).length > 0) {
+                const best = Object.values(links)[0];
+                return jsonResponse({ links, best, info: "Mode Déblocage (Plan B)" });
+            }
+        }
+    } catch (e) {}
+
+    return jsonError("VOD introuvable ou impossible à débloquer", 404);
 }
 
 async function handleProxy(url, request) {
-    const targetUrl = url.searchParams.get('url');
-    if (!targetUrl) return new Response("URL manquante", { status: 400 });
+    const target = url.searchParams.get('url');
+    if (!target) return new Response("URL manquante", { status: 400 });
 
-    const isVod = url.searchParams.get('isVod') === 'true' || targetUrl.includes('/vod/');
-    const originUrl = new URL(request.url);
-    // Correction URL pour supporter test2 ou autre
-    const workerBase = `${originUrl.protocol}//${originUrl.host}/api/proxy`;
+    const isVod = url.searchParams.get('isVod') === 'true' || target.includes('/vod/');
+    const workerUrl = new URL(request.url).origin + '/api/proxy';
 
-    if (targetUrl.includes('.m3u8')) {
-        const response = await fetch(targetUrl, { headers: COMMON_HEADERS });
-        let text = await response.text();
-        const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
+    // 1. Si c'est une playlist (.m3u8)
+    if (target.includes('.m3u8')) {
+        const res = await fetch(target, { headers: COMMON_HEADERS });
+        const text = await res.text();
+        const base = target.substring(0, target.lastIndexOf('/') + 1);
 
-        const newText = text.split('\n').map(line => {
-            const l = line.trim();
-            if (!l || l.startsWith('#')) return l;
-            const fullLink = l.startsWith('http') ? l : baseUrl + l;
-
-            if (l.includes('.m3u8')) {
-                return `${workerBase}?url=${encodeURIComponent(fullLink)}&isVod=${isVod}`;
-            } else {
-                if (isVod) return `${workerBase}?url=${encodeURIComponent(fullLink)}&isVod=true`;
-                else return fullLink; 
+        const newText = text.split('\n').map(l => {
+            const line = l.trim();
+            if (!line || line.startsWith('#')) return line;
+            const full = line.startsWith('http') ? line : base + line;
+            
+            // CORRECTION CORS : On force le proxy pour les segments VOD
+            if (line.includes('.m3u8') || isVod) {
+                return `${workerUrl}?url=${encodeURIComponent(full)}&isVod=${isVod}`;
             }
+            return full; 
         }).join('\n');
 
-        return new Response(newText, {
-            headers: { ...COMMON_HEADERS, 'Content-Type': 'application/vnd.apple.mpegurl' }
-        });
+        return new Response(newText, { headers: { ...COMMON_HEADERS, 'Content-Type': 'application/vnd.apple.mpegurl' } });
     }
 
-    const response = await fetch(targetUrl, { headers: COMMON_HEADERS });
-    return new Response(response.body, {
-        headers: { ...COMMON_HEADERS, 'Content-Type': response.headers.get('Content-Type') || 'video/MP2T' }
-    });
+    // 2. Si c'est un segment (.ts), on le proxy pour éviter l'erreur CORS rouge
+    const res = await fetch(target, { headers: COMMON_HEADERS });
+    return new Response(res.body, { headers: { ...COMMON_HEADERS, 'Content-Type': 'video/MP2T' } });
 }
 
-// --- HELPERS ---
+// --- OUTILS ---
 
 async function twitchGQL(query, variables = {}) {
-    // ICI : Ajout du User-Agent critique pour éviter le blocage Twitch
     const res = await fetch('https://gql.twitch.tv/gql', {
         method: 'POST',
-        headers: { 
-            'Client-ID': CLIENT_ID, 
+        headers: {
+            'Client-ID': CLIENT_ID,
             'Content-Type': 'application/json',
-            'User-Agent': COMMON_HEADERS['User-Agent'] // <--- C'EST CA QUI MANQUAIT
+            'User-Agent': COMMON_HEADERS['User-Agent'],
+            'Device-ID': 'MkMq8a9' + Math.random().toString(36).substring(2, 15)
         },
         body: JSON.stringify({ query, variables })
     });
-    
-    if (!res.ok) {
-        throw new Error(`Twitch API Error ${res.status}`);
-    }
-
+    // Si pas OK, on lance une erreur pour que le "catch" du Plan A s'active
+    if (!res.ok) throw new Error(`GQL Error ${res.status}`);
     return await res.json();
 }
 
-async function getLiveAccessToken(login) {
-    const query = `query PlaybackAccessToken_Template($login: String!, $isLive: Boolean!, $playerType: String!) { streamPlaybackAccessToken(channelName: $login, params: {platform: "web", playerBackend: "mediaplayer", playerType: $playerType}) @include(if: $isLive) { value signature } }`;
-    const data = await twitchGQL(query, { isLive: true, login, playerType: "site" });
-    return data.data?.streamPlaybackAccessToken;
+async function getAccessToken(id, isLive) {
+    const query = isLive 
+        ? `query { streamPlaybackAccessToken(channelName: "${id}", params: {platform: "web", playerBackend: "mediaplayer", playerType: "site"}) { value signature } }`
+        : `query { videoPlaybackAccessToken(id: "${id}", params: {platform: "web", playerBackend: "mediaplayer", playerType: "site"}) { value signature } }`;
+    
+    const data = await twitchGQL(query);
+    return isLive ? data.data.streamPlaybackAccessToken : data.data.videoPlaybackAccessToken;
 }
 
-async function getVodAccessToken(vodId) {
-    const query = `query PlaybackAccessToken_Template($vodID: ID!, $isVod: Boolean!, $playerType: String!) { videoPlaybackAccessToken(id: $vodID, params: {platform: "web", playerBackend: "mediaplayer", playerType: $playerType}) @include(if: $isVod) { value signature } }`;
-    const data = await twitchGQL(query, { isLive: false, isVod: true, vodID, playerType: "site" });
-    return data.data?.videoPlaybackAccessToken;
+async function storyboardHack(seekUrl) {
+    try {
+        const parts = seekUrl.split('/');
+        const storyIndex = parts.indexOf('storyboards');
+        if (storyIndex === -1) return {};
+        
+        const hash = parts[storyIndex - 1]; 
+        const root = `https://${new URL(seekUrl).host}/${hash}`;
+
+        let found = {};
+        await Promise.all(QUALITY_ORDER.map(async q => {
+            const u = `${root}/${q}/index-dvr.m3u8`;
+            const res = await fetch(u, { method: 'HEAD', headers: COMMON_HEADERS });
+            if (res.status === 200) found[q] = u;
+        }));
+        
+        let sorted = {};
+        QUALITY_ORDER.forEach(q => { if(found[q]) sorted[q] = found[q]; });
+        return sorted;
+    } catch(e) { return {}; }
 }
 
-function parseM3U8(content, masterUrl) {
+function parseM3U8(content, master) {
     const lines = content.split('\n');
-    let unsorted = {};
-    let lastInfo = "";
-    lines.forEach(line => {
-        if (line.startsWith('#EXT-X-STREAM-INF')) {
-            const resMatch = line.match(/RESOLUTION=(\d+x\d+)/);
-            const nameMatch = line.match(/VIDEO="([^"]+)"/);
-            let name = nameMatch ? nameMatch[1] : "Inconnue";
-            if (resMatch) name += ` (${resMatch[1]})`;
-            if (name.includes('chunked')) name = "Source (Best)";
-            lastInfo = name;
-        } else if (line.startsWith('http') && lastInfo) {
-            unsorted[lastInfo] = line;
-            lastInfo = "";
+    let links = { "Auto": master };
+    let last = "";
+    lines.forEach(l => {
+        if (l.includes('VIDEO="')) {
+            let n = l.match(/VIDEO="([^"]+)"/)[1];
+            if (n === 'chunked') n = 'Source';
+            last = n;
+        } else if (l.startsWith('http') && last) {
+            links[last] = l; last = "";
         }
     });
-    let sorted = { "Auto": masterUrl };
-    const order = ["Source", "1080p60", "1080p30", "1080p", "720p60", "720p30", "720p", "480p", "360p", "160p", "audio_only"];
-    order.forEach(k => { Object.keys(unsorted).forEach(u => { if (u.toLowerCase().includes(k.toLowerCase())) { sorted[u] = unsorted[u]; delete unsorted[u]; } }); });
-    Object.assign(sorted, unsorted);
-    return sorted;
+    return links;
 }
 
-function jsonResponse(data) {
-    return new Response(JSON.stringify(data), { headers: { ...COMMON_HEADERS, 'Content-Type': 'application/json' } });
-}
-
-function jsonError(msg, status = 400) {
-    return new Response(JSON.stringify({ error: msg }), { status, headers: { ...COMMON_HEADERS, 'Content-Type': 'application/json' } });
-}
+function jsonResponse(obj) { return new Response(JSON.stringify(obj), { headers: { ...COMMON_HEADERS, 'Content-Type': 'application/json' } }); }
+function jsonError(msg, status) { return new Response(JSON.stringify({ error: msg }), { status, headers: { ...COMMON_HEADERS, 'Content-Type': 'application/json' } }); }
