@@ -1,10 +1,11 @@
-// worker.js - VERSION V10 (Optimisation Cache + Performance)
+// worker.js - VERSION V12 (Support AirPlay & Range Requests)
 const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 
 const COMMON_HEADERS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Cache-Control', // Ajout Cache-Control
+    'Access-Control-Allow-Headers': 'Content-Type, Cache-Control, Range', // Ajout de Range
+    'Access-Control-Expose-Headers': 'Content-Length, Content-Range', // Important pour le lecteur
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
     'Referer': 'https://www.twitch.tv/',
     'Origin': 'https://www.twitch.tv'
@@ -21,11 +22,12 @@ export default {
         
         try {
             switch (url.pathname) {
-                case '/': return new Response("Twitch Proxy V10 Optimized", { headers: COMMON_HEADERS });
+                case '/': return new Response("Twitch Proxy V12 AirPlay Ready", { headers: COMMON_HEADERS });
                 case '/api/get-live': return await handleGetLive(url, workerOrigin);
                 case '/api/get-channel-videos': return await handleGetVideos(url);
                 case '/api/get-m3u8': return await handleGetM3U8(url, workerOrigin);
-                case '/api/proxy': return await handleProxy(url);
+                // MODIFICATION IMPORTANTE : On passe 'request' ici
+                case '/api/proxy': return await handleProxy(url, request);
                 default: return new Response("Not Found", { status: 404, headers: COMMON_HEADERS });
             }
         } catch (e) {
@@ -135,26 +137,30 @@ async function handleGetM3U8(url, workerOrigin) {
     return jsonError("VOD introuvable ou protégée", 404);
 }
 
-// --- PROXY OPTIMISÉ ---
-async function handleProxy(url) {
+// --- PROXY COMPATIBLE AIRPLAY ---
+async function handleProxy(url, request) {
     const target = url.searchParams.get('url');
     if (!target) return new Response("URL manquante", { status: 400 });
 
     const isVod = url.searchParams.get('isVod') === 'true';
     const workerOrigin = url.origin;
 
-    // OPTIMISATION : On récupère la réponse brute
-    const res = await fetch(target, { headers: COMMON_HEADERS });
+    // 1. Préparation des Headers pour Twitch (On transmet le Range si demandé par la TV)
+    let fetchHeaders = { ...COMMON_HEADERS };
+    if (request.headers.get("Range")) {
+        fetchHeaders["Range"] = request.headers.get("Range");
+    }
 
-    // Préparation des nouveaux en-têtes (Optimisation Cache)
+    const res = await fetch(target, { headers: fetchHeaders });
+
+    // 2. Préparation des Headers de réponse
     const newHeaders = new Headers(res.headers);
     newHeaders.set("Access-Control-Allow-Origin", "*");
+    newHeaders.set("Access-Control-Expose-Headers", "*"); // Important pour AirPlay
 
-    // 1. Si c'est une playlist (.m3u8) -> Pas de cache (car ça change en live), on doit réécrire
+    // Cas 1 : Playlist M3U8 (On doit réécrire les liens)
     if (target.includes('.m3u8')) {
         newHeaders.set("Content-Type", "application/vnd.apple.mpegurl");
-        newHeaders.set("Cache-Control", "no-cache, no-store, must-revalidate");
-
         const text = await res.text();
         const finalUrl = res.url; 
         const base = finalUrl.substring(0, finalUrl.lastIndexOf('/') + 1);
@@ -172,12 +178,12 @@ async function handleProxy(url) {
         return new Response(newText, { status: res.status, headers: newHeaders });
     }
 
-    // 2. Si c'est un segment vidéo (.ts) -> CACHE AGRESSIF
-    // On dit au navigateur : "Garde ce fichier pendant 1 an, il ne changera jamais"
-    newHeaders.set("Content-Type", "video/MP2T");
-    newHeaders.set("Cache-Control", "public, max-age=31536000, immutable");
-
-    return new Response(res.body, { status: res.status, headers: newHeaders });
+    // Cas 2 : Segment vidéo TS (On stream avec support Range)
+    // On renvoie exactement le status code de Twitch (200 ou 206 Partial Content)
+    return new Response(res.body, { 
+        status: res.status, 
+        headers: newHeaders 
+    });
 }
 
 // --- OUTILS ---
