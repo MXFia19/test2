@@ -1,10 +1,10 @@
-// worker.js - VERSION V11 (Économie Maximale - Liens Directs)
+// worker.js - VERSION V10 (Optimisation Cache + Performance)
 const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 
 const COMMON_HEADERS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Cache-Control',
+    'Access-Control-Allow-Headers': 'Content-Type, Cache-Control', // Ajout Cache-Control
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
     'Referer': 'https://www.twitch.tv/',
     'Origin': 'https://www.twitch.tv'
@@ -21,7 +21,7 @@ export default {
         
         try {
             switch (url.pathname) {
-                case '/': return new Response("Twitch Proxy V11 Eco Mode", { headers: COMMON_HEADERS });
+                case '/': return new Response("Twitch Proxy V10 Optimized", { headers: COMMON_HEADERS });
                 case '/api/get-live': return await handleGetLive(url, workerOrigin);
                 case '/api/get-channel-videos': return await handleGetVideos(url);
                 case '/api/get-m3u8': return await handleGetM3U8(url, workerOrigin);
@@ -70,8 +70,7 @@ async function handleGetLive(url, workerOrigin) {
         const res = await fetch(masterUrl, { headers: COMMON_HEADERS });
         if (!res.ok) throw new Error("Stream introuvable");
         
-        // Pour le LIVE, on garde le proxy intégral (nécessaire pour éviter les coupures CORS)
-        const links = parseAndProxyM3U8(await res.text(), res.url, workerOrigin, true); // true = force proxy for live to be safe
+        const links = parseAndProxyM3U8(await res.text(), res.url, workerOrigin, true);
         
         const metaQuery = `query { user(login: "${login}") { profileImageURL(width: 70) broadcastSettings { title game { displayName } } } }`;
         const meta = await twitchGQL(metaQuery);
@@ -102,9 +101,7 @@ async function handleGetM3U8(url, workerOrigin) {
             const masterUrl = `https://usher.ttvnw.net/vod/${vodId}.m3u8?nauth=${token.value}&nauthsig=${token.signature}&allow_source=true&player_backend=mediaplayer`;
             const res = await fetch(masterUrl, { headers: COMMON_HEADERS });
             if (res.ok) {
-                // Pour les VODs, on passe isVod=false dans le parseur
-                // Cela dit au parseur : "Ne proxyfie PAS les segments, donne les liens directs"
-                const links = parseAndProxyM3U8(await res.text(), res.url, workerOrigin, false);
+                const links = parseAndProxyM3U8(await res.text(), res.url, workerOrigin, true);
                 return jsonResponse({ links, best: links["Source"] || links["Auto"] });
             }
         }
@@ -120,14 +117,12 @@ async function handleGetM3U8(url, workerOrigin) {
             if (Object.keys(rawLinks).length > 0) {
                 let proxiedLinks = {};
                 const displayOrder = ['Source', '1080p60', '1080p30', '720p60', '720p30', '480p30', '360p30', '160p30', 'audio_only'];
-                
-                // Pour le plan B aussi, on proxyfie SEULEMENT la playlist, pas les segments
-                proxiedLinks["Auto"] = `${workerOrigin}/api/proxy?url=${encodeURIComponent(Object.values(rawLinks)[0])}&isVod=false`;
+                proxiedLinks["Auto"] = `${workerOrigin}/api/proxy?url=${encodeURIComponent(Object.values(rawLinks)[0])}&isVod=true`;
 
                 displayOrder.forEach(key => {
                     Object.keys(rawLinks).forEach(k => {
                         if (k.toLowerCase().includes(key.toLowerCase())) {
-                            proxiedLinks[k] = `${workerOrigin}/api/proxy?url=${encodeURIComponent(rawLinks[k])}&isVod=false`;
+                            proxiedLinks[k] = `${workerOrigin}/api/proxy?url=${encodeURIComponent(rawLinks[k])}&isVod=true`;
                             delete rawLinks[k];
                         }
                     });
@@ -140,20 +135,26 @@ async function handleGetM3U8(url, workerOrigin) {
     return jsonError("VOD introuvable ou protégée", 404);
 }
 
-// --- PROXY HYBRIDE (C'est ici la magie) ---
+// --- PROXY OPTIMISÉ ---
 async function handleProxy(url) {
     const target = url.searchParams.get('url');
     if (!target) return new Response("URL manquante", { status: 400 });
 
-    // Si isVod est 'true', on force tout par le proxy (pour le Live par exemple)
-    // Si isVod est 'false', on donne les liens directs pour économiser la bande passante
-    const forceProxy = url.searchParams.get('isVod') === 'true';
+    const isVod = url.searchParams.get('isVod') === 'true';
     const workerOrigin = url.origin;
 
+    // OPTIMISATION : On récupère la réponse brute
     const res = await fetch(target, { headers: COMMON_HEADERS });
 
-    // Si c'est une playlist (.m3u8), on DOIT la lire pour réécrire les liens dedans
+    // Préparation des nouveaux en-têtes (Optimisation Cache)
+    const newHeaders = new Headers(res.headers);
+    newHeaders.set("Access-Control-Allow-Origin", "*");
+
+    // 1. Si c'est une playlist (.m3u8) -> Pas de cache (car ça change en live), on doit réécrire
     if (target.includes('.m3u8')) {
+        newHeaders.set("Content-Type", "application/vnd.apple.mpegurl");
+        newHeaders.set("Cache-Control", "no-cache, no-store, must-revalidate");
+
         const text = await res.text();
         const finalUrl = res.url; 
         const base = finalUrl.substring(0, finalUrl.lastIndexOf('/') + 1);
@@ -162,41 +163,21 @@ async function handleProxy(url) {
             const line = l.trim();
             if (!line || line.startsWith('#')) return line;
             const full = line.startsWith('http') ? line : base + line;
-            
-            // LOGIQUE D'ÉCONOMIE :
-            // 1. Si c'est une autre playlist (.m3u8), on doit toujours la proxyfier
-            if (line.includes('.m3u8')) {
-                return `${workerOrigin}/api/proxy?url=${encodeURIComponent(full)}&isVod=${forceProxy}`;
+            if (line.includes('.m3u8') || isVod) {
+                return `${workerOrigin}/api/proxy?url=${encodeURIComponent(full)}&isVod=${isVod}`;
             }
-            // 2. Si c'est un segment (.ts)
-            // Si forceProxy est TRUE (Live), on proxyfie.
-            // Si forceProxy est FALSE (VOD), on renvoie le lien DIRECT (full).
-            if (forceProxy) {
-                return `${workerOrigin}/api/proxy?url=${encodeURIComponent(full)}&isVod=true`;
-            } else {
-                return full; // <--- C'est ça qui économise vos requêtes !
-            }
+            return full; 
         }).join('\n');
 
-        return new Response(newText, { 
-            status: res.status, 
-            headers: { 
-                ...COMMON_HEADERS, 
-                'Content-Type': 'application/vnd.apple.mpegurl',
-                'Cache-Control': 'no-cache, no-store, must-revalidate'
-            } 
-        });
+        return new Response(newText, { status: res.status, headers: newHeaders });
     }
 
-    // Si on arrive ici pour un .ts, c'est qu'on est en mode "Force Proxy" (Live)
-    return new Response(res.body, { 
-        status: res.status, 
-        headers: { 
-            ...COMMON_HEADERS, 
-            'Content-Type': 'video/MP2T',
-            'Cache-Control': 'public, max-age=31536000' 
-        } 
-    });
+    // 2. Si c'est un segment vidéo (.ts) -> CACHE AGRESSIF
+    // On dit au navigateur : "Garde ce fichier pendant 1 an, il ne changera jamais"
+    newHeaders.set("Content-Type", "video/MP2T");
+    newHeaders.set("Cache-Control", "public, max-age=31536000, immutable");
+
+    return new Response(res.body, { status: res.status, headers: newHeaders });
 }
 
 // --- OUTILS ---
@@ -243,7 +224,7 @@ async function storyboardHack(seekUrl) {
     } catch(e) { return {}; }
 }
 
-function parseAndProxyM3U8(content, master, workerOrigin, forceProxy) {
+function parseAndProxyM3U8(content, master, workerOrigin, isVod) {
     const lines = content.split('\n');
     const proxyBase = `${workerOrigin}/api/proxy?url=`;
     let unsorted = {};
@@ -252,11 +233,11 @@ function parseAndProxyM3U8(content, master, workerOrigin, forceProxy) {
         if (l.includes('VIDEO="')) {
             try { let n = l.split('VIDEO="')[1].split('"')[0]; if (n === 'chunked') n = 'Source'; last = n; } catch(e) {}
         } else if (l.startsWith('http') && last) {
-            unsorted[last] = `${proxyBase}${encodeURIComponent(l)}&isVod=${forceProxy}`; last = "";
+            unsorted[last] = `${proxyBase}${encodeURIComponent(l)}&isVod=${isVod}`; last = "";
         }
     });
     let sorted = {};
-    sorted["Auto"] = `${proxyBase}${encodeURIComponent(master)}&isVod=${forceProxy}`;
+    sorted["Auto"] = `${proxyBase}${encodeURIComponent(master)}&isVod=${isVod}`;
     const displayOrder = ['Source', '1080p60', '1080p30', '720p60', '720p30', '480p30', '360p30', '160p30', 'audio_only'];
     displayOrder.forEach(key => { Object.keys(unsorted).forEach(k => { if (k.toLowerCase().includes(key.toLowerCase())) { sorted[k] = unsorted[k]; delete unsorted[k]; } }); });
     Object.assign(sorted, unsorted);
