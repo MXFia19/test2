@@ -22,7 +22,7 @@ export default {
         
         try {
             switch (url.pathname) {
-                case '/': return new Response("Twitch Proxy V12 AirPlay Ready", { headers: COMMON_HEADERS });
+                case '/': return new Response("Twitch Proxy", { headers: COMMON_HEADERS });
                 case '/api/get-live': return await handleGetLive(url, workerOrigin);
                 case '/api/get-channel-videos': return await handleGetVideos(url);
                 case '/api/get-m3u8': return await handleGetM3U8(url, workerOrigin);
