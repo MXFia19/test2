@@ -4,10 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="TwitchUnblock">
-<link rel="apple-touch-icon" href="https://static.twitchcdn.net/assets/favicon-32-e29e246c157142c94346.png">
-
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TwitchUnblock">
     <title>Twitch VOD Unblocker</title>
     
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -17,7 +15,16 @@
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     
    <style>
-        :root { --primary: #9146ff; --dark: #0e0e10; --card: #18181b; --text: #efeff1; --danger: #ff4f4d; --outplayer: #007aff; --vlc: #ff8800; }
+        :root { 
+            --primary: #9146ff; 
+            --dark: #0e0e10; 
+            --card: #18181b; 
+            --text: #efeff1; 
+            --danger: #ff4f4d; 
+            --outplayer: #007aff; 
+            --vlc: #ff8800; 
+            --infuse: #fc3c44; /* Couleur de Infuse */
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body, button, input, select { font-family: 'Inter', sans-serif; }
         
@@ -40,11 +47,10 @@
             display: none; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.8); 
             border: 1px solid #333; 
-            border-radius: 12px; /* Coins arrondis pour le conteneur */
-            overflow: hidden; /* Important pour que la vidéo ne dépasse pas des coins */
+            border-radius: 12px; 
+            overflow: hidden; 
         }
         
-        /* Personnalisation Plyr */
         .plyr {
             --plyr-color-main: #9146ff; 
             --plyr-video-control-color: #efeff1;
@@ -53,18 +59,16 @@
             --plyr-menu-color: #efeff1;
             --plyr-menu-shadow: 0 4px 8px rgba(0,0,0,0.5);
             font-family: 'Inter', sans-serif;
-            border-radius: 12px !important; /* Coins arrondis pour le lecteur */
+            border-radius: 12px !important; 
         }
         
-        /* Bouton Play central style Twitch */
         .plyr--video .plyr__control--overlaid {
             background: rgba(0, 0, 0, 0.6);
-            border-radius: 12px; /* Un peu plus carré mais doux */
+            border-radius: 12px; 
         }
         .plyr--video .plyr__control--overlaid:hover {
             background: #9146ff;
         }
-        /* -------------------------------------- */
 
         #langSelect {
             position: absolute; top: 15px; right: 15px; background: #26262c; border: 1px solid #3a3a40; 
@@ -120,6 +124,7 @@
         @media (max-width: 600px) { 
             .container { padding: 15px; padding-top: 45px; width: 100%; } 
             .live-thumb-container { width: 100%; }
+            .vlc-section div { flex-wrap: wrap; }
         }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
@@ -136,10 +141,11 @@
         </div>
 
         <div id="mobile-alert" class="mobile-only">
-            <strong data-lang="mobile_title">📱 Mode Mobile</strong> <span data-lang="mobile_desc">Astuce : utilisez Outplayer ou VLC.</span>
-            <div style="display:flex; gap:10px; margin-top:10px;">
-                <button class="btn-secondary" style="background:var(--outplayer)" onclick="openInOutplayer()">Outplayer</button>
-                <button class="btn-secondary" style="background:var(--vlc)" onclick="openInVLC_Mobile()">VLC</button>
+            <strong data-lang="mobile_title">📱 Mode Mobile</strong> <span data-lang="mobile_desc">Astuce : utilisez Outplayer, VLC ou Infuse.</span>
+            <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+                <button class="btn-secondary" style="background:var(--outplayer); flex: 1;" onclick="openInOutplayer()">Outplayer</button>
+                <button class="btn-secondary" style="background:var(--vlc); flex: 1;" onclick="openInVLC_Mobile()">VLC</button>
+                <button class="btn-secondary" style="background:var(--infuse); flex: 1;" onclick="openInInfuse()">Infuse</button>
             </div>
         </div>
 
@@ -159,7 +165,6 @@
         </div>
 
         <div id="status-msg" data-lang="status_ready">Prêt.</div>
-        
         <div id="video-container"><video id="player" playsinline controls crossorigin></video></div>
 
         <div id="options-bar">
@@ -172,10 +177,11 @@
         <div id="vlc-section" class="vlc-section">
             <div style="font-size: 0.8rem; color: #aaa;" data-lang="lbl_link">Lien externe :</div>
             <input type="text" id="vlcLink" class="vlc-link" readonly onclick="this.select()">
-            <div style="display:flex; gap:10px;">
-                <button class="btn-secondary" onclick="copyLink()" data-lang="btn_copy">Copier</button>
-                <button class="btn-secondary mobile-only" style="background:var(--outplayer)" onclick="openInOutplayer()">Outplayer</button>
-                <button class="btn-secondary mobile-only" style="background:var(--vlc)" onclick="openInVLC_Mobile()">VLC App</button>
+            <div style="display:flex; gap:10px; flex-wrap: wrap;">
+                <button class="btn-secondary" style="flex: 1;" onclick="copyLink()" data-lang="btn_copy">Copier</button>
+                <button class="btn-secondary mobile-only" style="background:var(--outplayer); flex: 1;" onclick="openInOutplayer()">Outplayer</button>
+                <button class="btn-secondary mobile-only" style="background:var(--vlc); flex: 1;" onclick="openInVLC_Mobile()">VLC</button>
+                <button class="btn-secondary mobile-only" style="background:var(--infuse); flex: 1;" onclick="openInInfuse()">Infuse</button>
             </div>
         </div>
 
@@ -186,9 +192,9 @@
         const API_URL = "https://test2.kurzmathis4.workers.dev"; // URL DU WORKER
 
         const translations = {
-            fr: { title: "Regarder Twitch sans Sub", tab_id: "Lien / ID", tab_streamer: "Streamer", mobile_title: "📱 Mode Mobile", mobile_desc: "Astuce : utilisez Outplayer ou VLC.", ph_id: "ID ou Lien de la VOD", btn_unlock: "Déverrouiller", ph_streamer: "Nom du Streamer", btn_search: "🔍 Chercher (Live & VODs)", status_ready: "Prêt.", lbl_quality: "Qualité :", btn_pip: "📺 Activer PiP", btn_dl: "📥 Télécharger (Fichier)", lbl_link: "Lien externe :", btn_copy: "Copier", err_missing: "Nom manquant.", loading: "Recherche de", live_on: "EN DIRECT", btn_watch_live: "▶️ Regarder le Live", no_vod: "Aucune VOD trouvée.", vods_found: "VODs trouvées.", err_network: "Erreur réseau.", err_live: "Erreur Live.", loading_vod: "Chargement VOD...", vod_ready: "VOD Prête !", err_conn: "Erreur connexion.", copied: "Lien copié !", offline: "HORS LIGNE", offline_since: "Hors ligne depuis : ", day: "j", hour: "h", min: "min" },
-            en: { title: "Watch Twitch No Sub", tab_id: "Link / ID", tab_streamer: "Streamer", mobile_title: "📱 Mobile Mode", mobile_desc: "Tip: use Outplayer or VLC app.", ph_id: "VOD ID or Link", btn_unlock: "Unlock", ph_streamer: "Streamer Name", btn_search: "🔍 Search (Live & VODs)", status_ready: "Ready.", lbl_quality: "Quality:", btn_pip: "📺 Toggle PiP", btn_dl: "📥 Download (File)", lbl_link: "External Link:", btn_copy: "Copy", err_missing: "Name missing.", loading: "Searching for", live_on: "LIVE NOW", btn_watch_live: "▶️ Watch Live", no_vod: "No VODs found.", vods_found: "VODs found.", err_network: "Network error.", err_live: "Live error.", loading_vod: "Loading VOD...", vod_ready: "VOD Ready!", err_conn: "Connection error.", copied: "Link copied!", offline: "OFFLINE", offline_since: "Offline since: ", day: "d", hour: "h", min: "min" },
-            es: { title: "Ver Twitch sin Sub", tab_id: "Enlace / ID", tab_streamer: "Streamer", mobile_title: "📱 Modo Móvil", mobile_desc: "Consejo: usa Outplayer o VLC.", ph_id: "ID o Enlace VOD", btn_unlock: "Desbloquear", ph_streamer: "Nombre del Streamer", btn_search: "🔍 Buscar (Live & VODs)", status_ready: "Listo.", lbl_quality: "Calidad:", btn_pip: "📺 Modo PiP", btn_dl: "📥 Descargar", lbl_link: "Enlace externo:", btn_copy: "Copiar", err_missing: "Falta el nombre.", loading: "Buscando a", live_on: "EN VIVO", btn_watch_live: "▶️ Ver Directo", no_vod: "No se encontraron VODs.", vods_found: "VODs encontrados.", err_network: "Error de red.", err_live: "Error de directo.", loading_vod: "Cargando VOD...", vod_ready: "VOD Listo!", err_conn: "Error de conexión.", copied: "Enlace copiado!", offline: "DESCONECTADO", offline_since: "Desconectado desde: ", day: "d", hour: "h", min: "min" }
+            fr: { title: "Regarder Twitch sans Sub", tab_id: "Lien / ID", tab_streamer: "Streamer", mobile_title: "📱 Mode Mobile", mobile_desc: "Astuce : utilisez Outplayer, VLC ou Infuse.", ph_id: "ID ou Lien de la VOD", btn_unlock: "Déverrouiller", ph_streamer: "Nom du Streamer", btn_search: "🔍 Chercher (Live & VODs)", status_ready: "Prêt.", lbl_quality: "Qualité :", btn_pip: "📺 Activer PiP", btn_dl: "📥 Télécharger (Fichier)", lbl_link: "Lien externe :", btn_copy: "Copier", err_missing: "Nom manquant.", loading: "Recherche de", live_on: "EN DIRECT", btn_watch_live: "▶️ Regarder le Live", no_vod: "Aucune VOD trouvée.", vods_found: "VODs trouvées.", err_network: "Erreur réseau.", err_live: "Erreur Live.", loading_vod: "Chargement VOD...", vod_ready: "VOD Prête !", err_conn: "Erreur connexion.", copied: "Lien copié !", offline: "HORS LIGNE", offline_since: "Hors ligne depuis : ", day: "j", hour: "h", min: "min" },
+            en: { title: "Watch Twitch No Sub", tab_id: "Link / ID", tab_streamer: "Streamer", mobile_title: "📱 Mobile Mode", mobile_desc: "Tip: use Outplayer, VLC or Infuse.", ph_id: "VOD ID or Link", btn_unlock: "Unlock", ph_streamer: "Streamer Name", btn_search: "🔍 Search (Live & VODs)", status_ready: "Ready.", lbl_quality: "Quality:", btn_pip: "📺 Toggle PiP", btn_dl: "📥 Download (File)", lbl_link: "External Link:", btn_copy: "Copy", err_missing: "Name missing.", loading: "Searching for", live_on: "LIVE NOW", btn_watch_live: "▶️ Watch Live", no_vod: "No VODs found.", vods_found: "VODs found.", err_network: "Network error.", err_live: "Live error.", loading_vod: "Loading VOD...", vod_ready: "VOD Ready!", err_conn: "Connection error.", copied: "Link copied!", offline: "OFFLINE", offline_since: "Offline since: ", day: "d", hour: "h", min: "min" },
+            es: { title: "Ver Twitch sin Sub", tab_id: "Enlace / ID", tab_streamer: "Streamer", mobile_title: "📱 Modo Móvil", mobile_desc: "Consejo: usa Outplayer, VLC o Infuse.", ph_id: "ID o Enlace VOD", btn_unlock: "Desbloquear", ph_streamer: "Nombre del Streamer", btn_search: "🔍 Buscar (Live & VODs)", status_ready: "Listo.", lbl_quality: "Calidad:", btn_pip: "📺 Modo PiP", btn_dl: "📥 Descargar", lbl_link: "Enlace externo:", btn_copy: "Copiar", err_missing: "Falta el nombre.", loading: "Buscando a", live_on: "EN VIVO", btn_watch_live: "▶️ Ver Directo", no_vod: "No se encontraron VODs.", vods_found: "VODs encontrados.", err_network: "Error de red.", err_live: "Error de directo.", loading_vod: "Cargando VOD...", vod_ready: "VOD Listo!", err_conn: "Error de conexión.", copied: "Enlace copiado!", offline: "DESCONECTADO", offline_since: "Desconectado desde: ", day: "d", hour: "h", min: "min" }
         };
 
         let currentLang = 'fr';
@@ -201,7 +207,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             const userLang = navigator.language.slice(0, 2);
             if (translations[userLang]) setLanguage(userLang); else setLanguage('fr');
-            player = new Plyr('#player', { controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'airplay', 'fullscreen'], settings: ['speed'] });
+            player = new Plyr('#player', { controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'airplay', 'fullscreen'], settings: ['speed'], fullscreen: { enabled: true, fallback: true, iosNative: true } });
             
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('id')) { document.getElementById('vodInput').value = urlParams.get('id'); switchTab('direct'); searchVodById(); }
@@ -226,7 +232,6 @@
             else { document.querySelector('.tab-btn:nth-child(2)').classList.add('active'); document.getElementById('tab-channel').classList.add('active'); if (elements.vodList.children.length > 0) elements.vodList.style.display = 'grid'; }
         }
 
-        // FONCTION POUR CALCULER LE TEMPS ECOULÉ
         function getTimeSince(dateString, durationSeconds) {
             const endDate = new Date(new Date(dateString).getTime() + durationSeconds * 1000);
             const now = new Date();
@@ -277,8 +282,7 @@
                         </div>`;
                     if (autoPlay) watchLive();
                 } else {
-                    // CALCUL ET AFFICHAGE DU "HORS LIGNE DEPUIS"
-                    let offlineText = txt('offline_msg'); // Message par défaut
+                    let offlineText = txt('offline_msg'); 
                     
                     if (!dataVods.error && dataVods.videos && dataVods.videos.length > 0) {
                         const lastVod = dataVods.videos[0];
@@ -360,8 +364,7 @@
         function copyLink() { elements.vlcInput.select(); navigator.clipboard.writeText(elements.vlcInput.value); alert(txt('copied')); }
         function openInVLC_Mobile() { window.location.href = 'vlc://' + elements.vlcInput.value; }
         function openInOutplayer() { window.location.href = 'outplayer://' + elements.vlcInput.value; }
+        function openInInfuse() { window.location.href = 'infuse://x-callback-url/play?url=' + encodeURIComponent(elements.vlcInput.value); }
     </script>
 </body>
 </html>
-
-
