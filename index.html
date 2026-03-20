@@ -118,8 +118,9 @@
         .live-game { color: var(--primary); font-size: 0.9rem; font-weight: 600; }
         .live-badge { display: inline-block; background: #e91916; color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-bottom: 5px; }
 
-        #vod-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 20px; max-height: 50vh; overflow-y: auto; padding: 5px; display: none; }
-        .vod-card { background: #26262c; border-radius: 10px; overflow: hidden; cursor: pointer; text-align: left; }
+        #vod-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 20px; max-height: 60vh; overflow-y: auto; padding: 5px; display: none; }
+        .vod-card { background: #26262c; border-radius: 10px; overflow: hidden; cursor: pointer; text-align: left; transition: transform 0.2s; }
+        .vod-card:hover { transform: scale(1.02); border: 1px solid var(--primary); }
         .vod-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; }
         .vod-info { padding: 8px; }
         .vod-title { font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -146,8 +147,8 @@
         <h1 data-lang="title">Twitch VOD Unblocker</h1>
         
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('direct')" data-lang="tab_id">Lien / ID</button>
-            <button class="tab-btn" onclick="switchTab('channel')" data-lang="tab_streamer">Streamer</button>
+            <button class="tab-btn active" onclick="switchTab('channel')" data-lang="tab_streamer">Streamer</button>
+            <button class="tab-btn" onclick="switchTab('direct')" data-lang="tab_id">Lien / ID</button>
         </div>
 
         <div id="mobile-alert" class="mobile-only">
@@ -159,34 +160,35 @@
             </div>
         </div>
 
-        <div id="tab-direct" class="tab-content active">
+        <div id="history-container">
+            <div style="font-size: 0.8rem; color: #888; margin-bottom: 8px;" data-lang="lbl_history">Récemment lancés :</div>
+            <div id="history-list"></div>
+        </div>
+
+        <div id="tab-channel" class="tab-content active">
+            <div class="search-bar">
+                <input type="text" id="channelInput" placeholder="Nom du Streamer" data-placeholder="ph_streamer" onkeydown="if(event.key==='Enter') searchStreamer()">
+                <button class="btn-primary" onclick="searchStreamer()" data-lang="btn_search">🔍 Chercher</button>
+            </div>
+            <div id="live-area"></div>
+        </div>
+
+        <div id="tab-direct" class="tab-content">
             <div class="search-bar">
                 <input type="text" id="vodInput" placeholder="ID ou Lien de la VOD" data-placeholder="ph_id" onkeydown="if(event.key==='Enter') searchVodById()">
                 <button class="btn-primary" onclick="searchVodById()" data-lang="btn_unlock">Déverrouiller</button>
             </div>
         </div>
 
-        <div id="tab-channel" class="tab-content">
-            <div class="search-bar">
-                <input type="text" id="channelInput" placeholder="Nom du Streamer" data-placeholder="ph_streamer" onkeydown="if(event.key==='Enter') searchStreamer()">
-                <button class="btn-primary" onclick="searchStreamer()" data-lang="btn_search">🔍 Chercher (Live & VODs)</button>
-            </div>
-            <div id="live-area"></div>
-        </div>
-
-        <div id="history-container">
-            <div style="font-size: 0.8rem; color: #888; margin-bottom: 8px;" data-lang="lbl_history">Recherches récentes :</div>
-            <div id="history-list"></div>
-        </div>
-
         <div id="status-msg" data-lang="status_ready">Prêt.</div>
+        
         <div id="video-container"><video id="player" playsinline controls crossorigin></video></div>
 
         <div id="options-bar">
             <label data-lang="lbl_quality">Qualité :</label>
             <select id="qualitySelect" onchange="changeQuality()"></select>
             <button class="btn-secondary" onclick="togglePiP()" style="background-color: #e6e619; color: black;" data-lang="btn_pip">📺 Activer PiP</button>
-            <button class="btn-secondary" onclick="downloadM3U8()" data-lang="btn_dl">📥 Télécharger (Fichier)</button>
+            <button class="btn-secondary" onclick="downloadM3U8()" data-lang="btn_dl">📥 Fichier M3U8</button>
         </div>
 
         <div id="vlc-section" class="vlc-section">
@@ -207,9 +209,7 @@
         const API_URL = "https://test2.kurzmathis4.workers.dev"; // URL DU WORKER
 
         const translations = {
-            fr: { title: "Regarder Twitch sans Sub", tab_id: "Lien / ID", tab_streamer: "Streamer", mobile_title: "📱 Mode Mobile", mobile_desc: "Astuce : utilisez Outplayer, VLC ou Infuse.", ph_id: "ID ou Lien de la VOD", btn_unlock: "Déverrouiller", ph_streamer: "Nom du Streamer", btn_search: "🔍 Chercher (Live & VODs)", status_ready: "Prêt.", lbl_quality: "Qualité :", btn_pip: "📺 Activer PiP", btn_dl: "📥 Télécharger (Fichier)", lbl_link: "Lien externe :", btn_copy: "Copier", err_missing: "Nom manquant.", loading: "Recherche de", live_on: "EN DIRECT", btn_watch_live: "▶️ Regarder le Live", no_vod: "Aucune VOD trouvée.", vods_found: "VODs trouvées.", err_network: "Erreur réseau.", err_live: "Erreur Live.", loading_vod: "Chargement VOD...", vod_ready: "VOD Prête !", err_conn: "Erreur connexion.", copied: "Lien copié !", offline: "HORS LIGNE", offline_since: "Hors ligne depuis : ", day: "j", hour: "h", min: "min", lbl_history: "Recherches récentes :", btn_clear: "Effacer" },
-            en: { title: "Watch Twitch No Sub", tab_id: "Link / ID", tab_streamer: "Streamer", mobile_title: "📱 Mobile Mode", mobile_desc: "Tip: use Outplayer, VLC or Infuse.", ph_id: "VOD ID or Link", btn_unlock: "Unlock", ph_streamer: "Streamer Name", btn_search: "🔍 Search (Live & VODs)", status_ready: "Ready.", lbl_quality: "Quality:", btn_pip: "📺 Toggle PiP", btn_dl: "📥 Download (File)", lbl_link: "External Link:", btn_copy: "Copy", err_missing: "Name missing.", loading: "Searching for", live_on: "LIVE NOW", btn_watch_live: "▶️ Watch Live", no_vod: "No VODs found.", vods_found: "VODs found.", err_network: "Network error.", err_live: "Live error.", loading_vod: "Loading VOD...", vod_ready: "VOD Ready!", err_conn: "Connection error.", copied: "Link copied!", offline: "OFFLINE", offline_since: "Offline since: ", day: "d", hour: "h", min: "min", lbl_history: "Recent searches:", btn_clear: "Clear" },
-            es: { title: "Ver Twitch sin Sub", tab_id: "Enlace / ID", tab_streamer: "Streamer", mobile_title: "📱 Modo Móvil", mobile_desc: "Consejo: usa Outplayer, VLC o Infuse.", ph_id: "ID o Enlace VOD", btn_unlock: "Desbloquear", ph_streamer: "Nombre del Streamer", btn_search: "🔍 Buscar (Live & VODs)", status_ready: "Listo.", lbl_quality: "Calidad:", btn_pip: "📺 Modo PiP", btn_dl: "📥 Descargar", lbl_link: "Enlace externo:", btn_copy: "Copiar", err_missing: "Falta el nombre.", loading: "Buscando a", live_on: "EN VIVO", btn_watch_live: "▶️ Ver Directo", no_vod: "No se encontraron VODs.", vods_found: "VODs encontrados.", err_network: "Error de red.", err_live: "Error de directo.", loading_vod: "Cargando VOD...", vod_ready: "VOD Listo!", err_conn: "Error de conexión.", copied: "Enlace copiado!", offline: "DESCONECTADO", offline_since: "Desconectado desde: ", day: "d", hour: "h", min: "min", lbl_history: "Búsquedas recientes:", btn_clear: "Borrar" }
+            fr: { title: "Regarder Twitch sans Sub", tab_id: "Lien / ID", tab_streamer: "Streamer", mobile_title: "📱 Mode Mobile", mobile_desc: "Astuce : utilisez Outplayer, VLC ou Infuse.", ph_id: "ID ou Lien de la VOD", btn_unlock: "Déverrouiller", ph_streamer: "Nom du Streamer", btn_search: "🔍 Chercher", status_ready: "Prêt.", lbl_quality: "Qualité :", btn_pip: "📺 Activer PiP", btn_dl: "📥 Fichier M3U8", lbl_link: "Lien externe :", btn_copy: "Copier", err_missing: "Nom manquant.", loading: "Chargement...", live_on: "EN DIRECT", btn_watch_live: "▶️ Regarder le Live", no_vod: "Aucune VOD trouvée.", vods_found: "VODs trouvées.", err_network: "Erreur réseau.", err_live: "Erreur Live.", loading_vod: "Lancement VOD...", vod_ready: "VOD en lecture !", err_conn: "Erreur connexion.", copied: "Lien copié !", offline: "HORS LIGNE", offline_since: "Hors ligne depuis : ", day: "j", hour: "h", min: "min", lbl_history: "Récemment lancés :", btn_clear: "Effacer" }
         };
 
         let currentLang = 'fr';
@@ -218,7 +218,6 @@
         let player = null;
         let searchHistory = JSON.parse(localStorage.getItem('twitch_vod_history')) || [];
         
-        // --- VARIABLES POUR LA REPRISE LECTURE ---
         let currentVodId = null; 
         let isNewVodLoad = false;
         let lastSaveTime = 0;
@@ -231,10 +230,9 @@
             
             player = new Plyr('#player', { controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'airplay', 'fullscreen'], settings: ['speed'], fullscreen: { enabled: true, fallback: true, iosNative: true } });
             
-            // --- SYSTÈME DE SAUVEGARDE DU TEMPS ---
+            // --- SAUVEGARDE DU TEMPS ---
             player.on('timeupdate', () => {
                 const video = document.getElementById('player');
-                // Ne sauvegarde que pour les VODs (pas les lives), toutes les ~5 secondes de différence pour éviter de spammer
                 if (currentVodId && video.currentTime > 0) {
                     if (Math.abs(video.currentTime - lastSaveTime) > 5) {
                         localStorage.setItem('vod_progress_' + currentVodId, video.currentTime);
@@ -246,16 +244,26 @@
             renderHistory();
 
             const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('id')) { document.getElementById('vodInput').value = urlParams.get('id'); switchTab('direct'); searchVodById(); }
-            else if (urlParams.get('channel')) { document.getElementById('channelInput').value = urlParams.get('channel'); switchTab('channel'); searchStreamer(true); }
+            if (urlParams.get('id')) { 
+                document.getElementById('vodInput').value = urlParams.get('id'); 
+                switchTab('direct'); 
+                searchVodById(); 
+            } else if (urlParams.get('channel')) { 
+                document.getElementById('channelInput').value = urlParams.get('channel'); 
+                switchTab('channel'); 
+                searchStreamer(true); 
+            } else {
+                switchTab('channel'); // Streamer tab is default
+            }
             if (/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)) document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
         });
 
-        // --- GESTION HISTORIQUE ---
-        function saveToHistory(term, type) {
+        // --- GESTION HISTORIQUE AMÉLIORÉE ---
+        function saveToHistory(term, type, displayTitle) {
             searchHistory = searchHistory.filter(item => item.term.toLowerCase() !== term.toLowerCase());
-            searchHistory.unshift({ term, type }); 
-            if (searchHistory.length > 5) searchHistory.pop();
+            // On sauvegarde le vrai titre à afficher
+            searchHistory.unshift({ term, type, display: displayTitle || term }); 
+            if (searchHistory.length > 8) searchHistory.pop(); // Garde les 8 derniers
             localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory));
             renderHistory();
         }
@@ -271,16 +279,19 @@
             searchHistory.forEach(item => {
                 const tag = document.createElement('div');
                 tag.className = 'history-tag';
-                tag.innerHTML = `${item.type === 'channel' ? '👤' : '🎬'} ${item.term}`;
+                // Compatibilité avec les vieux historiques + Troncature du titre si trop long
+                const textToShow = item.display || item.term;
+                const shortText = textToShow.length > 25 ? textToShow.substring(0, 22) + '...' : textToShow;
+                
+                tag.innerHTML = `${item.type === 'channel' ? '👤' : '🎬'} ${shortText}`;
                 tag.onclick = () => {
                     if(item.type === 'channel') {
                         document.getElementById('channelInput').value = item.term;
                         switchTab('channel');
                         searchStreamer();
                     } else {
-                        document.getElementById('vodInput').value = item.term;
-                        switchTab('direct');
-                        searchVodById();
+                        // Si c'est une VOD, on la lance direct sans changer l'onglet
+                        fetchAndPlayVod(item.term, item.display);
                     }
                 };
                 elements.historyList.appendChild(tag);
@@ -295,10 +306,9 @@
 
         function setLanguage(lang) {
             currentLang = lang;
-            const t = translations[lang];
             if (elements.langSelect) elements.langSelect.value = lang;
-            document.querySelectorAll('[data-lang]').forEach(el => { const key = el.getAttribute('data-lang'); if (t[key]) el.textContent = t[key]; });
-            document.querySelectorAll('[data-placeholder]').forEach(el => { const key = el.getAttribute('data-placeholder'); if (t[key]) el.placeholder = t[key]; });
+            document.querySelectorAll('[data-lang]').forEach(el => { const key = el.getAttribute('data-lang'); if (translations[lang][key]) el.textContent = translations[lang][key]; });
+            document.querySelectorAll('[data-placeholder]').forEach(el => { const key = el.getAttribute('data-placeholder'); if (translations[lang][key]) el.placeholder = translations[lang][key]; });
             renderHistory();
         }
         function txt(key) { return translations[currentLang][key] || key; }
@@ -307,8 +317,16 @@
         function switchTab(tab) {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            if (tab === 'direct') { document.querySelector('.tab-btn:nth-child(1)').classList.add('active'); document.getElementById('tab-direct').classList.add('active'); elements.vodList.style.display = 'none'; elements.liveArea.innerHTML = ''; }
-            else { document.querySelector('.tab-btn:nth-child(2)').classList.add('active'); document.getElementById('tab-channel').classList.add('active'); if (elements.vodList.children.length > 0) elements.vodList.style.display = 'grid'; }
+            if (tab === 'channel') { 
+                document.querySelector('.tab-btn:nth-child(1)').classList.add('active'); 
+                document.getElementById('tab-channel').classList.add('active'); 
+                if (elements.vodList.children.length > 0) elements.vodList.style.display = 'grid'; 
+            } else { 
+                document.querySelector('.tab-btn:nth-child(2)').classList.add('active'); 
+                document.getElementById('tab-direct').classList.add('active'); 
+                elements.vodList.style.display = 'none'; 
+                elements.liveArea.innerHTML = ''; 
+            }
         }
 
         function getTimeSince(dateString, durationSeconds) {
@@ -333,21 +351,20 @@
             elements.liveArea.innerHTML = '';
             hidePlayer();
 
-            const pVods = fetch(`${API_URL}/api/get-channel-videos?name=${channelName}`);
-            const pLive = fetch(`${API_URL}/api/get-live?name=${channelName}`);
-
             try {
-                const [resVods, resLive] = await Promise.all([pVods, pLive]);
+                const [resVods, resLive] = await Promise.all([
+                    fetch(`${API_URL}/api/get-channel-videos?name=${channelName}`),
+                    fetch(`${API_URL}/api/get-live?name=${channelName}`)
+                ]);
                 const dataLive = await resLive.json();
                 const dataVods = await resVods.json();
 
-                if(!dataLive.error || !dataVods.error) { saveToHistory(channelName, 'channel'); }
+                if(!dataLive.error || !dataVods.error) { saveToHistory(channelName, 'channel', channelName); }
 
                 const avatarUrl = dataLive.avatar || dataVods.avatar || "https://static-cdn.jtvnw.net/user-default-pictures-uv/cdd517fe-def4-11e9-948e-784f43822e80-profile_image-70x70.png";
                 
                 if (!dataLive.error) {
                     const thumbUrl = dataLive.thumbnail ? dataLive.thumbnail.replace('{width}', '320').replace('{height}', '180') : "";
-                    
                     elements.liveArea.innerHTML = `
                         <div class="live-card online">
                             <img src="${avatarUrl}" class="live-avatar">
@@ -365,11 +382,8 @@
                     if (!dataVods.error && dataVods.videos && dataVods.videos.length > 0) {
                         const lastVod = dataVods.videos[0];
                         const timeSinceStr = getTimeSince(lastVod.publishedAt, lastVod.lengthSeconds);
-                        if (timeSinceStr) {
-                            offlineText = `<span style="color:#e91916; font-weight:700;">${txt('offline_since')} ${timeSinceStr}</span>`;
-                        }
+                        if (timeSinceStr) { offlineText = `<span style="color:#e91916; font-weight:700;">${txt('offline_since')} ${timeSinceStr}</span>`; }
                     }
-
                     elements.liveArea.innerHTML = `
                         <div class="live-card">
                             <img src="${avatarUrl}" class="live-avatar" style="border-color:#555">
@@ -389,7 +403,10 @@
                     dataVods.videos.forEach(vod => {
                         const card = document.createElement('div');
                         card.className = 'vod-card';
-                        card.onclick = () => loadVodFromCard(vod.id);
+                        
+                        // CLIC SUR LA VOD : On la lance sans changer d'onglet
+                        card.onclick = () => fetchAndPlayVod(vod.id, vod.title);
+                        
                         const duration = Math.floor(vod.lengthSeconds / 60) + ' min';
                         const date = new Date(vod.publishedAt).toLocaleDateString(currentLang === 'fr' ? 'fr-FR' : 'en-US');
                         card.innerHTML = `<img src="${vod.previewThumbnailURL}" class="vod-thumb"><div class="vod-info"><div class="vod-title">${vod.title}</div><div class="vod-meta">${date} • ${duration}</div></div>`;
@@ -406,33 +423,42 @@
                 const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
                 
-                currentVodId = null; // C'est un live, on ne sauvegarde pas le temps
+                currentVodId = null; 
                 setupPlayer(data.links);
-                setStatus(data.title, 'success');
+                setStatus("Live: " + data.title, 'success');
+                scrollToPlayer();
             } catch (e) { setStatus("err_live", 'error'); }
         }
 
-        function loadVodFromCard(id) { document.getElementById('vodInput').value = id; switchTab('direct'); searchVodById(); }
-        
-        async function searchVodById() {
-            const rawInput = document.getElementById('vodInput').value;
-            const id = (rawInput.match(/\d{8,}/) || [])[0];
-            if (!id) return setStatus("ID invalide", 'error');
-            
-            setStatus("loading", 'loading'); hidePlayer();
+        // --- NOUVELLE FONCTION UNIVERSELLE DE LECTURE ---
+        async function fetchAndPlayVod(id, title) {
+            setStatus("loading_vod", 'loading');
             try {
                 const response = await fetch(`${API_URL}/api/get-m3u8?id=${id}`);
                 const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
                 
-                saveToHistory(id, 'vod');
+                // Enregistrer dans l'historique avec le vrai titre
+                saveToHistory(id, 'vod', title || `VOD ${id}`);
                 
-                // Préparer la restauration du temps
                 currentVodId = id; 
                 isNewVodLoad = true; 
 
-                setupPlayer(data.links); setStatus("vod_ready", 'success');
+                setupPlayer(data.links); 
+                setStatus(title ? title : "vod_ready", 'success');
+                scrollToPlayer();
             } catch (e) { setStatus("err_conn", 'error'); }
+        }
+
+        function searchVodById() {
+            const rawInput = document.getElementById('vodInput').value;
+            const id = (rawInput.match(/\d{8,}/) || [])[0];
+            if (!id) return setStatus("ID invalide", 'error');
+            fetchAndPlayVod(id, null);
+        }
+
+        function scrollToPlayer() {
+            document.getElementById('video-container').scrollIntoView({ behavior: "smooth", block: "start" });
         }
 
         function setupPlayer(links) {
@@ -446,13 +472,12 @@
             elements.vlcInput.value = rawUrl; 
             const video = document.getElementById('player');
             
-            // Calcul du temps à restaurer
             let timeToRestore = isNewVodLoad ? 0 : video.currentTime;
             if (isNewVodLoad && currentVodId) {
                 const savedTime = localStorage.getItem('vod_progress_' + currentVodId);
                 if (savedTime) timeToRestore = parseFloat(savedTime);
             }
-            isNewVodLoad = false; // Désactiver pour les prochains changements de qualité manuels
+            isNewVodLoad = false; 
 
             const restoreAndPlay = () => {
                 if (timeToRestore > 0) video.currentTime = timeToRestore;
@@ -477,6 +502,7 @@
         function copyLink() { elements.vlcInput.select(); navigator.clipboard.writeText(elements.vlcInput.value); alert(txt('copied')); }
         function openInVLC_Mobile() { window.location.href = 'vlc://' + elements.vlcInput.value; }
         function openInOutplayer() { window.location.href = 'outplayer://' + elements.vlcInput.value; }
+        
         function openInInfuse() { 
             let targetName = document.getElementById('channelInput').value.trim() || document.getElementById('vodInput').value.trim() || "Twitch_Live";
             targetName = targetName.replace(/[^a-zA-Z0-9]/g, "_");
