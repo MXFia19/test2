@@ -93,7 +93,6 @@
         .btn-primary { background: var(--primary); }
         .btn-secondary { background: #3a3a40; font-size: 0.9rem; width: 100%; margin-top: 10px; }
 
-        /* --- NOUVEAU : STYLE HISTORIQUE --- */
         #history-container { display: none; margin-bottom: 20px; animation: fadeIn 0.3s; }
         #history-list { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
         .history-tag {
@@ -219,6 +218,11 @@
         let player = null;
         let searchHistory = JSON.parse(localStorage.getItem('twitch_vod_history')) || [];
         
+        // --- VARIABLES POUR LA REPRISE LECTURE ---
+        let currentVodId = null; 
+        let isNewVodLoad = false;
+        let lastSaveTime = 0;
+
         const elements = { status: document.getElementById('status-msg'), vodList: document.getElementById('vod-list'), videoContainer: document.getElementById('video-container'), optionsBar: document.getElementById('options-bar'), vlcSection: document.getElementById('vlc-section'), qualitySelect: document.getElementById('qualitySelect'), vlcInput: document.getElementById('vlcLink'), liveArea: document.getElementById('live-area'), langSelect: document.getElementById('langSelect'), historyContainer: document.getElementById('history-container'), historyList: document.getElementById('history-list') };
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -227,6 +231,18 @@
             
             player = new Plyr('#player', { controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'airplay', 'fullscreen'], settings: ['speed'], fullscreen: { enabled: true, fallback: true, iosNative: true } });
             
+            // --- SYSTÈME DE SAUVEGARDE DU TEMPS ---
+            player.on('timeupdate', () => {
+                const video = document.getElementById('player');
+                // Ne sauvegarde que pour les VODs (pas les lives), toutes les ~5 secondes de différence pour éviter de spammer
+                if (currentVodId && video.currentTime > 0) {
+                    if (Math.abs(video.currentTime - lastSaveTime) > 5) {
+                        localStorage.setItem('vod_progress_' + currentVodId, video.currentTime);
+                        lastSaveTime = video.currentTime;
+                    }
+                }
+            });
+
             renderHistory();
 
             const urlParams = new URLSearchParams(window.location.search);
@@ -237,9 +253,9 @@
 
         // --- GESTION HISTORIQUE ---
         function saveToHistory(term, type) {
-            searchHistory = searchHistory.filter(item => item.term.toLowerCase() !== term.toLowerCase()); // Supprime les doublons
-            searchHistory.unshift({ term, type }); // Ajoute au début
-            if (searchHistory.length > 5) searchHistory.pop(); // Garde les 5 derniers
+            searchHistory = searchHistory.filter(item => item.term.toLowerCase() !== term.toLowerCase());
+            searchHistory.unshift({ term, type }); 
+            if (searchHistory.length > 5) searchHistory.pop();
             localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory));
             renderHistory();
         }
@@ -283,7 +299,7 @@
             if (elements.langSelect) elements.langSelect.value = lang;
             document.querySelectorAll('[data-lang]').forEach(el => { const key = el.getAttribute('data-lang'); if (t[key]) el.textContent = t[key]; });
             document.querySelectorAll('[data-placeholder]').forEach(el => { const key = el.getAttribute('data-placeholder'); if (t[key]) el.placeholder = t[key]; });
-            renderHistory(); // Pour traduire le bouton "Effacer"
+            renderHistory();
         }
         function txt(key) { return translations[currentLang][key] || key; }
         function setStatus(msgKey, type) { elements.status.textContent = translations[currentLang][msgKey] || msgKey; elements.status.className = type ? 'status-' + type : ''; }
@@ -299,13 +315,10 @@
             const endDate = new Date(new Date(dateString).getTime() + durationSeconds * 1000);
             const now = new Date();
             const diff = now - endDate;
-
             if (diff < 0) return ""; 
-
             const minutes = Math.floor(diff / 60000);
             const hours = Math.floor(diff / 3600000);
             const days = Math.floor(diff / 86400000);
-
             if (days > 0) return `${days} ${txt('day')}`;
             if (hours > 0) return `${hours} ${txt('hour')}`;
             return `${minutes} ${txt('min')}`;
@@ -328,7 +341,6 @@
                 const dataLive = await resLive.json();
                 const dataVods = await resVods.json();
 
-                // On sauvegarde dans l'historique si on a trouvé quelque chose (live ou VODs)
                 if(!dataLive.error || !dataVods.error) { saveToHistory(channelName, 'channel'); }
 
                 const avatarUrl = dataLive.avatar || dataVods.avatar || "https://static-cdn.jtvnw.net/user-default-pictures-uv/cdd517fe-def4-11e9-948e-784f43822e80-profile_image-70x70.png";
@@ -350,7 +362,6 @@
                     if (autoPlay) watchLive();
                 } else {
                     let offlineText = txt('offline_msg'); 
-                    
                     if (!dataVods.error && dataVods.videos && dataVods.videos.length > 0) {
                         const lastVod = dataVods.videos[0];
                         const timeSinceStr = getTimeSince(lastVod.publishedAt, lastVod.lengthSeconds);
@@ -394,12 +405,15 @@
                 const response = await fetch(`${API_URL}/api/get-live?name=${channelName}`);
                 const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
+                
+                currentVodId = null; // C'est un live, on ne sauvegarde pas le temps
                 setupPlayer(data.links);
                 setStatus(data.title, 'success');
             } catch (e) { setStatus("err_live", 'error'); }
         }
 
         function loadVodFromCard(id) { document.getElementById('vodInput').value = id; switchTab('direct'); searchVodById(); }
+        
         async function searchVodById() {
             const rawInput = document.getElementById('vodInput').value;
             const id = (rawInput.match(/\d{8,}/) || [])[0];
@@ -411,8 +425,11 @@
                 const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
                 
-                // On sauvegarde dans l'historique
                 saveToHistory(id, 'vod');
+                
+                // Préparer la restauration du temps
+                currentVodId = id; 
+                isNewVodLoad = true; 
 
                 setupPlayer(data.links); setStatus("vod_ready", 'success');
             } catch (e) { setStatus("err_conn", 'error'); }
@@ -426,9 +443,32 @@
 
         function changeQuality() {
             const rawUrl = currentLinks[elements.qualitySelect.value]; if (!rawUrl) return;
-            elements.vlcInput.value = rawUrl; const video = document.getElementById('player');
-            if (Hls.isSupported()) { if (hls) hls.destroy(); hls = new Hls(); hls.loadSource(rawUrl); hls.attachMedia(video); hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(()=>{})); }
-            else if (video.canPlayType('application/vnd.apple.mpegurl')) { video.src = rawUrl; video.play(); }
+            elements.vlcInput.value = rawUrl; 
+            const video = document.getElementById('player');
+            
+            // Calcul du temps à restaurer
+            let timeToRestore = isNewVodLoad ? 0 : video.currentTime;
+            if (isNewVodLoad && currentVodId) {
+                const savedTime = localStorage.getItem('vod_progress_' + currentVodId);
+                if (savedTime) timeToRestore = parseFloat(savedTime);
+            }
+            isNewVodLoad = false; // Désactiver pour les prochains changements de qualité manuels
+
+            const restoreAndPlay = () => {
+                if (timeToRestore > 0) video.currentTime = timeToRestore;
+                video.play().catch(()=>{});
+            };
+
+            if (Hls.isSupported()) { 
+                if (hls) hls.destroy(); 
+                hls = new Hls(); 
+                hls.loadSource(rawUrl); 
+                hls.attachMedia(video); 
+                hls.on(Hls.Events.MANIFEST_PARSED, restoreAndPlay); 
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) { 
+                video.src = rawUrl; 
+                video.addEventListener('loadedmetadata', restoreAndPlay, { once: true });
+            }
         }
 
         function hidePlayer() { elements.optionsBar.style.display = 'none'; elements.videoContainer.style.display = 'none'; elements.vlcSection.style.display = 'none'; if (hls) hls.destroy(); player.stop(); }
@@ -437,7 +477,6 @@
         function copyLink() { elements.vlcInput.select(); navigator.clipboard.writeText(elements.vlcInput.value); alert(txt('copied')); }
         function openInVLC_Mobile() { window.location.href = 'vlc://' + elements.vlcInput.value; }
         function openInOutplayer() { window.location.href = 'outplayer://' + elements.vlcInput.value; }
-        
         function openInInfuse() { 
             let targetName = document.getElementById('channelInput').value.trim() || document.getElementById('vodInput').value.trim() || "Twitch_Live";
             targetName = targetName.replace(/[^a-zA-Z0-9]/g, "_");
