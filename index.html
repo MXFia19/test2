@@ -41,39 +41,24 @@
         }
 
         #video-container { 
-            width: 100%; 
-            margin-bottom: 20px; 
-            display: none; 
+            width: 100%; margin-bottom: 20px; display: none; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.8); 
-            border: 1px solid #333; 
-            border-radius: 12px; 
-            overflow: hidden; 
+            border: 1px solid #333; border-radius: 12px; overflow: hidden; 
         }
         
         .plyr {
-            --plyr-color-main: #9146ff; 
-            --plyr-video-control-color: #efeff1;
+            --plyr-color-main: #9146ff; --plyr-video-control-color: #efeff1;
             --plyr-video-control-background-hover: rgba(255, 255, 255, 0.15);
-            --plyr-menu-background: #18181b;
-            --plyr-menu-color: #efeff1;
-            --plyr-menu-shadow: 0 4px 8px rgba(0,0,0,0.5);
-            font-family: 'Inter', sans-serif;
-            border-radius: 12px !important; 
+            --plyr-menu-background: #18181b; --plyr-menu-color: #efeff1;
+            font-family: 'Inter', sans-serif; border-radius: 12px !important; 
         }
-        
-        .plyr--video .plyr__control--overlaid {
-            background: rgba(0, 0, 0, 0.6);
-            border-radius: 12px; 
-        }
-        .plyr--video .plyr__control--overlaid:hover {
-            background: #9146ff;
-        }
+        .plyr--video .plyr__control--overlaid { background: rgba(0, 0, 0, 0.6); border-radius: 12px; }
+        .plyr--video .plyr__control--overlaid:hover { background: #9146ff; }
 
         #langSelect {
             position: absolute; top: 15px; right: 15px; background: #26262c; border: 1px solid #3a3a40; 
             color: #888; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; 
-            font-weight: 700; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s; 
-            z-index: 10; appearance: none; -webkit-appearance: none; -moz-appearance: none; text-align: center; width: auto;
+            font-weight: 700; text-transform: uppercase; z-index: 10;
         }
 
         h1 { font-weight: 800; margin-bottom: 20px; color: #bf94ff; font-size: 1.5rem; margin-top: 0; }
@@ -86,24 +71,47 @@
         .tab-content { display: none; animation: fadeIn 0.3s; }
         .tab-content.active { display: block; }
 
-        .search-bar { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap;}
+        .search-bar { display: flex; gap: 10px; justify-content: center; margin-bottom: 10px; flex-wrap: wrap;}
         input[type="text"] { background: #26262c; border: 2px solid #3a3a40; color: white; padding: 12px; border-radius: 10px; font-size: 1rem; flex: 1; min-width: 200px; transition: 0.2s; }
         input[type="text"]:focus { outline: none; border-color: var(--primary); }
         button { border: none; padding: 12px 20px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 1rem; color: white; transition: 0.2s; white-space: nowrap; }
         .btn-primary { background: var(--primary); }
         .btn-secondary { background: #3a3a40; font-size: 0.9rem; width: 100%; margin-top: 10px; }
 
-        #history-container { display: none; margin-bottom: 20px; animation: fadeIn 0.3s; }
-        #history-list { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+        /* --- STYLES HISTORIQUES --- */
+        .history-title { font-size: 0.85rem; color: #aaa; margin: 15px 0 10px 0; font-weight: 600; text-align: left; padding-left: 5px; }
+        
+        /* Historique VOD (Carrousel) */
+        #vod-history-container { display: none; margin-bottom: 25px; width: 100%; animation: fadeIn 0.4s; }
+        #vod-history-list { 
+            display: flex; gap: 12px; overflow-x: auto; padding-bottom: 10px; 
+            scrollbar-width: none; /* Firefox */
+        }
+        #vod-history-list::-webkit-scrollbar { display: none; /* Safari/Chrome */ }
+        .history-vod-card {
+            display: flex; align-items: center; gap: 12px; background: #26262c;
+            border: 1px solid #3a3a40; padding: 8px; border-radius: 12px;
+            cursor: pointer; transition: 0.2s; width: 240px; flex-shrink: 0; text-align: left;
+        }
+        .history-vod-card:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: 0 4px 10px rgba(145, 70, 255, 0.2); }
+        .history-vod-thumb { width: 80px; height: 45px; object-fit: cover; border-radius: 6px; background: #111; }
+        .history-vod-info { flex: 1; overflow: hidden; }
+        .history-vod-title { font-size: 0.8rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: white; margin-bottom: 2px; }
+        .history-vod-streamer { font-size: 0.7rem; color: var(--primary); font-weight: 600; }
+
+        /* Historique Streamers (Boutons) */
+        #channel-history-container { display: none; margin-bottom: 20px; animation: fadeIn 0.4s; }
+        #channel-history-list { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
         .history-tag {
             background: #26262c; border: 1px solid #3a3a40; color: #ccc; 
-            padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
+            padding: 8px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;
             cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 5px;
         }
         .history-tag:hover { background: var(--primary); color: white; border-color: var(--primary); transform: scale(1.05); }
-        .history-clear { font-size: 0.75rem; color: var(--danger); cursor: pointer; margin-left: 8px; font-weight: 600; align-self: center; transition: 0.2s; padding: 6px; }
+        .history-clear { font-size: 0.75rem; color: var(--danger); cursor: pointer; font-weight: 600; align-self: center; transition: 0.2s; padding: 6px; margin-left: auto; }
         .history-clear:hover { color: white; }
 
+        /* --- STYLES CARTES --- */
         .live-card {
             background: rgba(0,0,0,0.2); border: 1px solid #3a3a40; border-radius: 12px; 
             padding: 15px; margin-bottom: 25px; text-align: left; animation: fadeIn 0.5s;
@@ -118,18 +126,18 @@
         .live-game { color: var(--primary); font-size: 0.9rem; font-weight: 600; }
         .live-badge { display: inline-block; background: #e91916; color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-bottom: 5px; }
 
-        #vod-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 20px; max-height: 60vh; overflow-y: auto; padding: 5px; display: none; }
-        .vod-card { background: #26262c; border-radius: 10px; overflow: hidden; cursor: pointer; text-align: left; transition: transform 0.2s; }
-        .vod-card:hover { transform: scale(1.02); border: 1px solid var(--primary); }
+        #vod-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-top: 20px; max-height: 60vh; overflow-y: auto; padding: 5px; display: none; }
+        .vod-card { background: #26262c; border-radius: 10px; overflow: hidden; cursor: pointer; text-align: left; transition: transform 0.2s; border: 1px solid transparent; }
+        .vod-card:hover { transform: scale(1.03); border-color: var(--primary); }
         .vod-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; }
-        .vod-info { padding: 8px; }
-        .vod-title { font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .vod-info { padding: 10px; }
+        .vod-title { font-size: 0.8rem; font-weight: 600; margin-bottom: 5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3;}
         .vod-meta { font-size: 0.7rem; color: #aaa; }
 
         #options-bar, .vlc-section { display: none; flex-direction: column; gap: 10px; margin-bottom: 20px; background: #1f1f23; padding: 15px; border-radius: 12px; }
         select { background: #26262c; color: white; border: 1px solid #3a3a40; padding: 10px; border-radius: 8px; font-size: 1rem; width: 100%; }
         input.vlc-link { width: 100%; font-family: monospace; color: #bf94ff; text-align: center; font-size: 0.8rem; }
-        #status-msg { margin-bottom: 15px; font-weight: 500; min-height: 1.2em; font-size: 0.9rem; }
+        #status-msg { margin-bottom: 15px; font-weight: 600; min-height: 1.2em; font-size: 0.95rem; }
         .status-loading { color: #e6e619; } .status-success { color: #00ff88; } .status-error { color: #ff4f4d; }
 
         @media (max-width: 600px) { 
@@ -160,9 +168,9 @@
             </div>
         </div>
 
-        <div id="history-container">
-            <div style="font-size: 0.8rem; color: #888; margin-bottom: 8px;" data-lang="lbl_history">Récemment lancés :</div>
-            <div id="history-list"></div>
+        <div id="vod-history-container">
+            <div class="history-title" data-lang="lbl_vod_history">VODs récemment regardées :</div>
+            <div id="vod-history-list"></div>
         </div>
 
         <div id="tab-channel" class="tab-content active">
@@ -170,6 +178,12 @@
                 <input type="text" id="channelInput" placeholder="Nom du Streamer" data-placeholder="ph_streamer" onkeydown="if(event.key==='Enter') searchStreamer()">
                 <button class="btn-primary" onclick="searchStreamer()" data-lang="btn_search">🔍 Chercher</button>
             </div>
+            
+            <div id="channel-history-container">
+                <div class="history-title" style="margin-top: 5px;" data-lang="lbl_channel_history">Streamers récents :</div>
+                <div id="channel-history-list"></div>
+            </div>
+
             <div id="live-area"></div>
         </div>
 
@@ -206,10 +220,12 @@
     </div>
 
     <script>
-        const API_URL = "https://test2.kurzmathis4.workers.dev"; // URL DU WORKER
+        const API_URL = "https://test2.kurzmathis4.workers.dev";
 
         const translations = {
-            fr: { title: "Regarder Twitch sans Sub", tab_id: "Lien / ID", tab_streamer: "Streamer", mobile_title: "📱 Mode Mobile", mobile_desc: "Astuce : utilisez Outplayer, VLC ou Infuse.", ph_id: "ID ou Lien de la VOD", btn_unlock: "Déverrouiller", ph_streamer: "Nom du Streamer", btn_search: "🔍 Chercher", status_ready: "Prêt.", lbl_quality: "Qualité :", btn_pip: "📺 Activer PiP", btn_dl: "📥 Fichier M3U8", lbl_link: "Lien externe :", btn_copy: "Copier", err_missing: "Nom manquant.", loading: "Chargement...", live_on: "EN DIRECT", btn_watch_live: "▶️ Regarder le Live", no_vod: "Aucune VOD trouvée.", vods_found: "VODs trouvées.", err_network: "Erreur réseau.", err_live: "Erreur Live.", loading_vod: "Lancement VOD...", vod_ready: "VOD en lecture !", err_conn: "Erreur connexion.", copied: "Lien copié !", offline: "HORS LIGNE", offline_since: "Hors ligne depuis : ", day: "j", hour: "h", min: "min", lbl_history: "Récemment lancés :", btn_clear: "Effacer" }
+            fr: { title: "Regarder Twitch sans Sub", tab_id: "Lien / ID", tab_streamer: "Streamer", mobile_title: "📱 Mode Mobile", mobile_desc: "Astuce : utilisez Outplayer, VLC ou Infuse.", ph_id: "ID ou Lien de la VOD", btn_unlock: "Déverrouiller", ph_streamer: "Nom du Streamer", btn_search: "🔍 Chercher", status_ready: "Prêt.", lbl_quality: "Qualité :", btn_pip: "📺 Activer PiP", btn_dl: "📥 Fichier M3U8", lbl_link: "Lien externe :", btn_copy: "Copier", err_missing: "Nom manquant.", loading: "Chargement...", live_on: "EN DIRECT", btn_watch_live: "▶️ Regarder le Live", no_vod: "Aucune VOD trouvée.", vods_found: "VODs trouvées.", err_network: "Erreur réseau.", err_live: "Erreur Live.", loading_vod: "Lancement VOD...", vod_ready: "VOD en lecture !", err_conn: "Erreur connexion.", copied: "Lien copié !", offline: "HORS LIGNE", offline_since: "Hors ligne depuis : ", day: "j", hour: "h", min: "min", lbl_vod_history: "VODs récemment regardées :", lbl_channel_history: "Streamers récents :", btn_clear: "Effacer", not_found: "❌ Streamer introuvable.", offline_msg: "Pas de stream en cours." },
+            en: { title: "Watch Twitch No Sub", tab_id: "Link / ID", tab_streamer: "Streamer", mobile_title: "📱 Mobile Mode", mobile_desc: "Tip: use Outplayer, VLC or Infuse.", ph_id: "VOD ID or Link", btn_unlock: "Unlock", ph_streamer: "Streamer Name", btn_search: "🔍 Search", status_ready: "Ready.", lbl_quality: "Quality:", btn_pip: "📺 Toggle PiP", btn_dl: "📥 Download (File)", lbl_link: "External Link:", btn_copy: "Copy", err_missing: "Name missing.", loading: "Loading...", live_on: "LIVE NOW", btn_watch_live: "▶️ Watch Live", no_vod: "No VODs found.", vods_found: "VODs found.", err_network: "Network error.", err_live: "Live error.", loading_vod: "Loading VOD...", vod_ready: "VOD Playing!", err_conn: "Connection error.", copied: "Link copied!", offline: "OFFLINE", offline_since: "Offline since: ", day: "d", hour: "h", min: "min", lbl_vod_history: "Recently watched VODs:", lbl_channel_history: "Recent Streamers:", btn_clear: "Clear", not_found: "❌ Streamer not found.", offline_msg: "Stream is offline." },
+            es: { title: "Ver Twitch sin Sub", tab_id: "Enlace / ID", tab_streamer: "Streamer", mobile_title: "📱 Modo Móvil", mobile_desc: "Consejo: usa Outplayer, VLC o Infuse.", ph_id: "ID o Enlace VOD", btn_unlock: "Desbloquear", ph_streamer: "Nombre del Streamer", btn_search: "🔍 Buscar", status_ready: "Listo.", lbl_quality: "Calidad:", btn_pip: "📺 Modo PiP", btn_dl: "📥 Descargar", lbl_link: "Enlace externo:", btn_copy: "Copiar", err_missing: "Falta el nombre.", loading: "Cargando...", live_on: "EN VIVO", btn_watch_live: "▶️ Ver Directo", no_vod: "No se encontraron VODs.", vods_found: "VODs encontrados.", err_network: "Error de red.", err_live: "Error de directo.", loading_vod: "Cargando VOD...", vod_ready: "VOD Reproduciendo!", err_conn: "Error de conexión.", copied: "Enlace copiado!", offline: "DESCONECTADO", offline_since: "Desconectado desde: ", day: "d", hour: "h", min: "min", lbl_vod_history: "VODs recientes:", lbl_channel_history: "Streamers recientes:", btn_clear: "Borrar", not_found: "❌ Streamer no encontrado.", offline_msg: "No hay directo en curso." }
         };
 
         let currentLang = 'fr';
@@ -222,7 +238,7 @@
         let isNewVodLoad = false;
         let lastSaveTime = 0;
 
-        const elements = { status: document.getElementById('status-msg'), vodList: document.getElementById('vod-list'), videoContainer: document.getElementById('video-container'), optionsBar: document.getElementById('options-bar'), vlcSection: document.getElementById('vlc-section'), qualitySelect: document.getElementById('qualitySelect'), vlcInput: document.getElementById('vlcLink'), liveArea: document.getElementById('live-area'), langSelect: document.getElementById('langSelect'), historyContainer: document.getElementById('history-container'), historyList: document.getElementById('history-list') };
+        const elements = { status: document.getElementById('status-msg'), vodList: document.getElementById('vod-list'), videoContainer: document.getElementById('video-container'), optionsBar: document.getElementById('options-bar'), vlcSection: document.getElementById('vlc-section'), qualitySelect: document.getElementById('qualitySelect'), vlcInput: document.getElementById('vlcLink'), liveArea: document.getElementById('live-area'), langSelect: document.getElementById('langSelect'), vodHistoryContainer: document.getElementById('vod-history-container'), vodHistoryList: document.getElementById('vod-history-list'), chanHistoryContainer: document.getElementById('channel-history-container'), chanHistoryList: document.getElementById('channel-history-list') };
 
         document.addEventListener('DOMContentLoaded', () => {
             const userLang = navigator.language.slice(0, 2);
@@ -230,7 +246,6 @@
             
             player = new Plyr('#player', { controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'airplay', 'fullscreen'], settings: ['speed'], fullscreen: { enabled: true, fallback: true, iosNative: true } });
             
-            // --- SAUVEGARDE DU TEMPS ---
             player.on('timeupdate', () => {
                 const video = document.getElementById('player');
                 if (currentVodId && video.currentTime > 0) {
@@ -246,62 +261,73 @@
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('id')) { 
                 document.getElementById('vodInput').value = urlParams.get('id'); 
-                switchTab('direct'); 
-                searchVodById(); 
+                switchTab('direct'); searchVodById(); 
             } else if (urlParams.get('channel')) { 
                 document.getElementById('channelInput').value = urlParams.get('channel'); 
-                switchTab('channel'); 
-                searchStreamer(true); 
-            } else {
-                switchTab('channel'); // Streamer tab is default
-            }
+                switchTab('channel'); searchStreamer(true); 
+            } else { switchTab('channel'); }
+            
             if (/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)) document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
         });
 
-        // --- GESTION HISTORIQUE AMÉLIORÉE ---
-        function saveToHistory(term, type, displayTitle) {
+        // --- GESTION HISTORIQUE SÉPARÉE ---
+        function saveToHistory(term, type, displayTitle, extraData = {}) {
             searchHistory = searchHistory.filter(item => item.term.toLowerCase() !== term.toLowerCase());
-            // On sauvegarde le vrai titre à afficher
-            searchHistory.unshift({ term, type, display: displayTitle || term }); 
-            if (searchHistory.length > 8) searchHistory.pop(); // Garde les 8 derniers
+            searchHistory.unshift({ term, type, display: displayTitle || term, ...extraData }); 
+            if (searchHistory.length > 20) searchHistory.pop(); // Garde les 20 derniers max en mémoire globale
             localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory));
             renderHistory();
         }
 
         function renderHistory() {
-            if (searchHistory.length === 0) {
-                elements.historyContainer.style.display = 'none';
-                return;
-            }
-            elements.historyContainer.style.display = 'block';
-            elements.historyList.innerHTML = '';
-            
-            searchHistory.forEach(item => {
-                const tag = document.createElement('div');
-                tag.className = 'history-tag';
-                // Compatibilité avec les vieux historiques + Troncature du titre si trop long
-                const textToShow = item.display || item.term;
-                const shortText = textToShow.length > 25 ? textToShow.substring(0, 22) + '...' : textToShow;
+            const vods = searchHistory.filter(h => h.type === 'vod').slice(0, 10); // 10 VODs max
+            const channels = searchHistory.filter(h => h.type === 'channel').slice(0, 5); // 5 Streamers max
+
+            // VODS (En haut)
+            if (vods.length > 0) {
+                elements.vodHistoryContainer.style.display = 'block';
+                elements.vodHistoryList.innerHTML = '';
+                vods.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'history-vod-card';
+                    const thumb = item.thumb || "https://vod-secure.twitch.tv/_404/404_processing_320x180.png";
+                    const streamer = item.streamer || "VOD";
+                    div.innerHTML = `<img src="${thumb}" class="history-vod-thumb"><div class="history-vod-info"><div class="history-vod-title">${item.display}</div><div class="history-vod-streamer">${streamer}</div></div>`;
+                    div.onclick = () => {
+                        document.getElementById('vodInput').value = item.term;
+                        fetchAndPlayVod(item.term, item.display, item.thumb, item.streamer);
+                    };
+                    elements.vodHistoryList.appendChild(div);
+                });
+            } else { elements.vodHistoryContainer.style.display = 'none'; }
+
+            // STREAMERS (En bas de barre)
+            if (channels.length > 0) {
+                elements.chanHistoryContainer.style.display = 'block';
+                elements.chanHistoryList.innerHTML = '';
                 
-                tag.innerHTML = `${item.type === 'channel' ? '👤' : '🎬'} ${shortText}`;
-                tag.onclick = () => {
-                    if(item.type === 'channel') {
+                channels.forEach(item => {
+                    const tag = document.createElement('div');
+                    tag.className = 'history-tag';
+                    tag.innerHTML = `👤 ${item.display}`;
+                    tag.onclick = () => {
                         document.getElementById('channelInput').value = item.term;
                         switchTab('channel');
                         searchStreamer();
-                    } else {
-                        // Si c'est une VOD, on la lance direct sans changer l'onglet
-                        fetchAndPlayVod(item.term, item.display);
-                    }
-                };
-                elements.historyList.appendChild(tag);
-            });
+                    };
+                    elements.chanHistoryList.appendChild(tag);
+                });
 
-            const clearBtn = document.createElement('div');
-            clearBtn.className = 'history-clear';
-            clearBtn.innerHTML = `✖ ${txt('btn_clear')}`;
-            clearBtn.onclick = () => { searchHistory = []; localStorage.removeItem('twitch_vod_history'); renderHistory(); };
-            elements.historyList.appendChild(clearBtn);
+                const clearBtn = document.createElement('div');
+                clearBtn.className = 'history-clear';
+                clearBtn.innerHTML = `✖ ${txt('btn_clear')}`;
+                clearBtn.onclick = () => { 
+                    searchHistory = searchHistory.filter(h => h.type === 'vod'); // Efface juste les channels
+                    localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory)); 
+                    renderHistory(); 
+                };
+                elements.chanHistoryList.appendChild(clearBtn);
+            } else { elements.chanHistoryContainer.style.display = 'none'; }
         }
 
         function setLanguage(lang) {
@@ -359,9 +385,16 @@
                 const dataLive = await resLive.json();
                 const dataVods = await resVods.json();
 
-                if(!dataLive.error || !dataVods.error) { saveToHistory(channelName, 'channel', channelName); }
+                // GESTION ERREUR : LE STREAMER N'EXISTE PAS
+                const hasAvatar = dataLive.avatar || dataVods.avatar;
+                if (dataLive.error && dataVods.error && !hasAvatar) {
+                    setStatus("not_found", 'error');
+                    return;
+                }
 
-                const avatarUrl = dataLive.avatar || dataVods.avatar || "https://static-cdn.jtvnw.net/user-default-pictures-uv/cdd517fe-def4-11e9-948e-784f43822e80-profile_image-70x70.png";
+                saveToHistory(channelName, 'channel', channelName);
+
+                const avatarUrl = hasAvatar || "https://static-cdn.jtvnw.net/user-default-pictures-uv/cdd517fe-def4-11e9-948e-784f43822e80-profile_image-70x70.png";
                 
                 if (!dataLive.error) {
                     const thumbUrl = dataLive.thumbnail ? dataLive.thumbnail.replace('{width}', '320').replace('{height}', '180') : "";
@@ -378,7 +411,7 @@
                         </div>`;
                     if (autoPlay) watchLive();
                 } else {
-                    let offlineText = txt('offline_msg'); 
+                    let offlineText = txt('offline_msg') || "Pas de stream en cours."; 
                     if (!dataVods.error && dataVods.videos && dataVods.videos.length > 0) {
                         const lastVod = dataVods.videos[0];
                         const timeSinceStr = getTimeSince(lastVod.publishedAt, lastVod.lengthSeconds);
@@ -404,8 +437,8 @@
                         const card = document.createElement('div');
                         card.className = 'vod-card';
                         
-                        // CLIC SUR LA VOD : On la lance sans changer d'onglet
-                        card.onclick = () => fetchAndPlayVod(vod.id, vod.title);
+                        // CLIC SUR LA VOD : On la lance sans changer d'onglet, et on sauvegarde l'image !
+                        card.onclick = () => fetchAndPlayVod(vod.id, vod.title, vod.previewThumbnailURL, channelName);
                         
                         const duration = Math.floor(vod.lengthSeconds / 60) + ' min';
                         const date = new Date(vod.publishedAt).toLocaleDateString(currentLang === 'fr' ? 'fr-FR' : 'en-US');
@@ -430,16 +463,15 @@
             } catch (e) { setStatus("err_live", 'error'); }
         }
 
-        // --- NOUVELLE FONCTION UNIVERSELLE DE LECTURE ---
-        async function fetchAndPlayVod(id, title) {
+        // LECTURE VOD AMÉLIORÉE (Sauvegarde l'image et le nom)
+        async function fetchAndPlayVod(id, title, thumb = null, streamer = null) {
             setStatus("loading_vod", 'loading');
             try {
                 const response = await fetch(`${API_URL}/api/get-m3u8?id=${id}`);
                 const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
                 
-                // Enregistrer dans l'historique avec le vrai titre
-                saveToHistory(id, 'vod', title || `VOD ${id}`);
+                saveToHistory(id, 'vod', title || `VOD ${id}`, { thumb: thumb, streamer: streamer });
                 
                 currentVodId = id; 
                 isNewVodLoad = true; 
