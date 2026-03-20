@@ -519,11 +519,33 @@
             } catch (e) { setStatus("err_conn", 'error'); }
         }
 
-        function searchVodById() {
+       async function searchVodById() {
             const rawInput = document.getElementById('vodInput').value;
             const id = (rawInput.match(/\d{8,}/) || [])[0];
             if (!id) return setStatus("ID invalide", 'error');
-            fetchAndPlayVod(id, null);
+            
+            setStatus("loading_vod", 'loading');
+            
+            // --- NOUVEAU : On récupère le Titre et l'Image avant de lancer ---
+            let title = null, thumb = null, streamer = null;
+            try {
+                const res = await fetch('https://gql.twitch.tv/gql', {
+                    method: 'POST',
+                    headers: { 'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko' },
+                    body: JSON.stringify({ 
+                        query: `query { video(id: "${id}") { title, owner { displayName }, previewThumbnailURL(height: 180, width: 320) } }` 
+                    })
+                });
+                const json = await res.json();
+                if (json.data && json.data.video) {
+                    title = json.data.video.title;
+                    streamer = json.data.video.owner?.displayName || "Inconnu";
+                    thumb = json.data.video.previewThumbnailURL;
+                }
+            } catch (e) {
+                console.error("Erreur récupération infos VOD:", e);
+            }
+            fetchAndPlayVod(id, title, thumb, streamer);
         }
 
         function scrollToPlayer() {
