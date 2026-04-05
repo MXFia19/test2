@@ -294,6 +294,8 @@
             }
         }
 
+let currentTopLang = 'fr'; // Garde en mémoire le choix (FR ou Monde)
+
         // --- SYSTÈME DÉCOUVERTE ---
         async function loadDiscovery() {
             const followedDiv = document.getElementById('discovery-followed');
@@ -318,7 +320,9 @@
             `;
 
             followedDiv.innerHTML = '<span class="status-loading">Chargement de vos chaînes...</span>';
-            topDiv.innerHTML = '<span class="status-loading">Chargement du Top FR...</span>';
+            
+            // On charge le Top Streams en parallèle avec la dernière langue choisie
+            loadTopStreams(currentTopLang);
 
             try {
                 const userRes = await fetch('https://api.twitch.tv/helix/users', { headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': HELIX_CLIENT_ID } });
@@ -327,19 +331,43 @@
                 const userData = await userRes.json();
                 const userId = userData.data[0].id;
 
-                const [resFollowed, resTop] = await Promise.all([
-                    fetch(`https://api.twitch.tv/helix/streams/followed?user_id=${userId}&first=20`, { headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': HELIX_CLIENT_ID } }),
-                    fetch(`https://api.twitch.tv/helix/streams?first=20&language=fr`, { headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': HELIX_CLIENT_ID } })
-                ]);
+                const resFollowed = await fetch(`https://api.twitch.tv/helix/streams/followed?user_id=${userId}&first=20`, { headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': HELIX_CLIENT_ID } });
+                const dataFollowed = await resFollowed.json();
                 
-                const dataFollowed = await resFollowed.json(); const dataTop = await resTop.json();
                 followedDiv.innerHTML = renderStreamGrid(dataFollowed.data);
-                topDiv.innerHTML = renderStreamGrid(dataTop.data);
             } catch (e) {
                 localStorage.removeItem('twitch_token'); 
                 followedDiv.innerHTML = '<span class="status-error" style="grid-column: 1 / -1;">Session expirée. Veuillez vous reconnecter.</span>';
                 topDiv.innerHTML = ''; controlsDiv.innerHTML = '';
                 setTimeout(loadDiscovery, 2000); 
+            }
+        }
+
+        // --- GESTION DU TOP STREAMS (FR / MONDE) ---
+        async function loadTopStreams(lang) {
+            currentTopLang = lang;
+            const topDiv = document.getElementById('discovery-top');
+            const token = localStorage.getItem('twitch_token');
+            if (!token) return;
+
+            // Mise à jour de l'apparence des boutons
+            document.getElementById('btn-top-fr').classList.remove('active');
+            document.getElementById('btn-top-world').classList.remove('active');
+            if(lang === 'fr') document.getElementById('btn-top-fr').classList.add('active');
+            else document.getElementById('btn-top-world').classList.add('active');
+
+            topDiv.innerHTML = '<span class="status-loading">Chargement du Top...</span>';
+            
+            // Si c'est 'fr', on filtre par langue. Sinon (Monde), on demande tout court !
+            let url = `https://api.twitch.tv/helix/streams?first=20`;
+            if (lang === 'fr') url += `&language=fr`;
+
+            try {
+                const resTop = await fetch(url, { headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': HELIX_CLIENT_ID } });
+                const dataTop = await resTop.json();
+                topDiv.innerHTML = renderStreamGrid(dataTop.data);
+            } catch (e) {
+                topDiv.innerHTML = '<span class="status-error" style="grid-column: 1 / -1;">Erreur lors du chargement.</span>';
             }
         }
 
