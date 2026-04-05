@@ -107,6 +107,31 @@
         @media (max-width: 600px) { .container { padding: 15px; padding-top: 45px; width: 100%; } .live-thumb-container { width: 100%; } .vlc-section div { flex-wrap: wrap; } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
+
+    <script>
+        // --- 1. MAGIE DU POPUP (Doit être exécuté en tout premier) ---
+        // Si cette page est ouverte dans un popup de connexion Twitch et contient le jeton
+        if (window.opener && window.location.hash.includes('access_token=')) {
+            // Envoie le jeton à la fenêtre principale
+            window.opener.postMessage(window.location.hash, window.location.origin);
+            // Ferme le popup immédiatement
+            window.close();
+        }
+
+        // --- 2. ÉCOUTEUR DU POPUP (Sur la fenêtre principale) ---
+        window.addEventListener('message', (event) => {
+            // Vérification de sécurité pour s'assurer que le message vient bien de notre propre site
+            if (event.origin !== window.location.origin) return; 
+
+            if (typeof event.data === 'string' && event.data.includes('access_token=')) {
+                const token = new URLSearchParams(event.data.substring(1)).get('access_token');
+                if (token) {
+                    localStorage.setItem('twitch_token', token);
+                    loadDiscovery(); // Met à jour la page Découverte sans recharger la page
+                }
+            }
+        });
+    </script>
 </head>
 <body>
 
@@ -156,8 +181,7 @@
         <div id="tab-discovery" class="tab-content active">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
                 <div class="history-title" style="margin: 0;">💜 Vos Chaînes Suivies</div>
-                <div id="discovery-controls" style="display: flex; gap: 10px;">
-                    </div>
+                <div id="discovery-controls" style="display: flex; gap: 10px;"></div>
             </div>
             <div id="discovery-followed" class="stream-grid"></div>
 
@@ -188,8 +212,7 @@
 
     <script>
         const API_URL = "https://test2.kurzmathis4.workers.dev";
-        // VOS IDENTIFIANTS API HELIX OFFICIELS (Pris de votre message)
-        const HELIX_CLIENT_ID = "7s5tfsi0d6inpd5j6hqyra7hk2qbxo"; 
+        const HELIX_CLIENT_ID = "f2s32e14j29t0onam56mfhqgfnl9na"; 
 
         const translations = {
             fr: { title: "Regarder Twitch sans Sub", tab_discovery: "🌟 Découverte", tab_id: "Lien / ID", tab_streamer: "Streamer", mobile_title: "📱 Mode Mobile", mobile_desc: "Astuce : utilisez Outplayer, VLC ou Infuse.", ph_id: "ID ou Lien de la VOD", btn_unlock: "Déverrouiller", ph_streamer: "Nom du Streamer", btn_search: "🔍 Chercher", status_ready: "Prêt.", lbl_quality: "Qualité :", btn_pip: "📺 Activer PiP", btn_dl: "📥 Fichier M3U8", lbl_link: "Lien externe :", btn_copy: "Copier", err_missing: "Nom manquant.", loading: "Chargement...", live_on: "EN DIRECT", btn_watch_live: "▶️ Regarder le Live", no_vod: "Aucune VOD trouvée.", vods_found: "VODs trouvées.", err_network: "Erreur réseau.", err_live: "Erreur Live.", loading_vod: "Lancement VOD...", vod_ready: "VOD en lecture !", err_conn: "Erreur connexion.", copied: "Lien copié !", offline: "HORS LIGNE", offline_since: "Hors ligne depuis : ", day: "j", hour: "h", min: "min", lbl_vod_history: "VODs récemment regardées :", lbl_channel_history: "Streamers récents :", btn_clear: "Effacer", not_found: "❌ Streamer introuvable.", offline_msg: "Pas de stream en cours." },
@@ -202,7 +225,6 @@
         let hls = null;
         let player = null;
         let searchHistory = JSON.parse(localStorage.getItem('twitch_vod_history')) || [];
-        
         let currentVodId = null; 
         let isNewVodLoad = false;
         let lastSaveTime = 0;
@@ -223,9 +245,7 @@
                 }
             });
 
-            // GESTION CONNEXION TWITCH (Récupère le Token dans l'URL si on revient de Twitch)
-            checkTwitchAuth();
-
+            checkTwitchAuthFallback(); // Vérifie s'il y a un token si on a navigué directement sans popup
             renderHistory();
 
             const urlParams = new URLSearchParams(window.location.search);
@@ -240,42 +260,45 @@
             if (/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)) document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
         });
 
-// --- AUTHENTIFICATION TWITCH ---
+        // --- AUTHENTIFICATION TWITCH AVEC POPUP ---
         function loginTwitch() {
-            // ON FORCE LA VRAIE ADRESSE VERCEL ICI :
             const redirectUri = "https://test2-fawn-eta.vercel.app/"; 
-            
-            // Demande d'accès en mode "Implicit" (response_type=token)
             const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${HELIX_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=user:read:follows`;
-            window.location.href = authUrl;
-        }
-        function logoutTwitch() {
-            localStorage.removeItem('twitch_token');
-            loadDiscovery(); // Recharge la page découverte
+            
+            // Ouvre la fenêtre popup
+            const width = 500;
+            const height = 700;
+            const left = (screen.width / 2) - (width / 2);
+            const top = (screen.height / 2) - (height / 2);
+            window.open(authUrl, 'TwitchLogin', `width=${width},height=${height},top=${top},left=${left}`);
         }
 
-        function checkTwitchAuth() {
+        function logoutTwitch() {
+            localStorage.removeItem('twitch_token');
+            loadDiscovery(); 
+        }
+
+        function checkTwitchAuthFallback() {
+            // Uniquement si l'utilisateur a ouvert le lien d'auth dans le même onglet sans faire exprès
             const hash = window.location.hash;
-            if (hash.includes('access_token=')) {
+            if (hash.includes('access_token=') && !window.opener) {
                 const token = new URLSearchParams(hash.substring(1)).get('access_token');
                 if (token) {
                     localStorage.setItem('twitch_token', token);
-                    // Nettoie l'URL pour faire propre
                     window.history.replaceState(null, null, window.location.pathname); 
                 }
             }
         }
 
-        // --- SYSTÈME DÉCOUVERTE (HELIX API DIRECT CLIENT) ---
+        // --- SYSTÈME DÉCOUVERTE ---
         async function loadDiscovery() {
             const followedDiv = document.getElementById('discovery-followed');
             const topDiv = document.getElementById('discovery-top');
             const controlsDiv = document.getElementById('discovery-controls');
-            
             const token = localStorage.getItem('twitch_token');
 
             if (!token) {
-                controlsDiv.innerHTML = ``; // Pas de boutons en haut
+                controlsDiv.innerHTML = ``; 
                 followedDiv.innerHTML = `
                 <div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; background: rgba(0,0,0,0.3); border-radius: 12px; border: 1px dashed #333;">
                     <p style="margin-bottom: 15px; color: #aaa; font-weight: 600;">Connectez-vous pour retrouver facilement vos chaînes préférées.</p>
@@ -285,7 +308,6 @@
                 return;
             }
 
-            // Boutons pour un utilisateur connecté
             controlsDiv.innerHTML = `
                 <button class="btn-secondary" style="width:auto; padding: 5px 10px; margin:0;" onclick="loadDiscovery()">🔄 Actualiser</button>
                 <button class="btn-secondary" style="width:auto; padding: 5px 10px; margin:0; background: rgba(255, 79, 77, 0.2); color: var(--danger); border: 1px solid var(--danger);" onclick="logoutTwitch()">Déconnexion</button>
@@ -295,46 +317,30 @@
             topDiv.innerHTML = '<span class="status-loading">Chargement du Top FR...</span>';
 
             try {
-                // 1. Récupérer l'ID de l'utilisateur connecté grâce à son jeton
-                const userRes = await fetch('https://api.twitch.tv/helix/users', {
-                    headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': HELIX_CLIENT_ID }
-                });
-                
+                const userRes = await fetch('https://api.twitch.tv/helix/users', { headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': HELIX_CLIENT_ID } });
                 if (!userRes.ok) throw new Error("Token invalide ou expiré");
                 
                 const userData = await userRes.json();
                 const userId = userData.data[0].id;
 
-                // 2. Récupérer les follows ET le top fr en même temps
                 const [resFollowed, resTop] = await Promise.all([
-                    fetch(`https://api.twitch.tv/helix/streams/followed?user_id=${userId}&first=20`, { 
-                        headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': HELIX_CLIENT_ID } 
-                    }),
-                    fetch(`https://api.twitch.tv/helix/streams?first=20&language=fr`, { 
-                        headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': HELIX_CLIENT_ID } 
-                    })
+                    fetch(`https://api.twitch.tv/helix/streams/followed?user_id=${userId}&first=20`, { headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': HELIX_CLIENT_ID } }),
+                    fetch(`https://api.twitch.tv/helix/streams?first=20&language=fr`, { headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': HELIX_CLIENT_ID } })
                 ]);
                 
-                const dataFollowed = await resFollowed.json();
-                const dataTop = await resTop.json();
-
+                const dataFollowed = await resFollowed.json(); const dataTop = await resTop.json();
                 followedDiv.innerHTML = renderStreamGrid(dataFollowed.data);
                 topDiv.innerHTML = renderStreamGrid(dataTop.data);
-
             } catch (e) {
-                console.error(e);
-                localStorage.removeItem('twitch_token'); // On supprime le jeton buggé
+                localStorage.removeItem('twitch_token'); 
                 followedDiv.innerHTML = '<span class="status-error" style="grid-column: 1 / -1;">Session expirée. Veuillez vous reconnecter.</span>';
-                topDiv.innerHTML = '';
-                controlsDiv.innerHTML = '';
-                // Relance automatiquement pour afficher le bouton de login
+                topDiv.innerHTML = ''; controlsDiv.innerHTML = '';
                 setTimeout(loadDiscovery, 2000); 
             }
         }
 
         function renderStreamGrid(streams) {
             if (!streams || streams.length === 0) return "<span style='color:#aaa; grid-column: 1 / -1;'>Aucune chaîne en live pour le moment.</span>";
-            
             return streams.map(s => {
                 const thumb = s.thumbnail_url.replace('{width}', '320').replace('{height}', '180');
                 const viewers = s.viewer_count >= 1000 ? (s.viewer_count/1000).toFixed(1) + 'k' : s.viewer_count;
@@ -350,45 +356,30 @@
             }).join('');
         }
 
-        function playFromDiscovery(channelName) {
-            document.getElementById('channelInput').value = channelName;
-            switchTab('channel');
-            searchStreamer(true);
-        }
+        function playFromDiscovery(channelName) { document.getElementById('channelInput').value = channelName; switchTab('channel'); searchStreamer(true); }
 
         // --- GESTION HISTORIQUE ---
         function saveToHistory(term, type, displayTitle, extraData = {}) {
             searchHistory = searchHistory.filter(item => item.term.toLowerCase() !== term.toLowerCase());
             searchHistory.unshift({ term, type, display: displayTitle || term, ...extraData }); 
             if (searchHistory.length > 20) searchHistory.pop();
-            localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory));
-            renderHistory();
+            localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory)); renderHistory();
         }
 
         function removeFromHistory(event, term) {
-            event.stopPropagation(); 
-            searchHistory = searchHistory.filter(item => item.term !== term);
-            localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory));
-            renderHistory();
+            event.stopPropagation(); searchHistory = searchHistory.filter(item => item.term !== term);
+            localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory)); renderHistory();
         }
 
         function renderHistory() {
             const vods = searchHistory.filter(h => h.type === 'vod').slice(0, 10); 
             const channels = searchHistory.filter(h => h.type === 'channel').slice(0, 5); 
-
-            const elements = { 
-                vodHistoryContainer: document.getElementById('vod-history-container'), 
-                vodHistoryList: document.getElementById('vod-history-list'), 
-                chanHistoryContainer: document.getElementById('channel-history-container'), 
-                chanHistoryList: document.getElementById('channel-history-list') 
-            };
+            const elements = { vodHistoryContainer: document.getElementById('vod-history-container'), vodHistoryList: document.getElementById('vod-history-list'), chanHistoryContainer: document.getElementById('channel-history-container'), chanHistoryList: document.getElementById('channel-history-list') };
 
             if (vods.length > 0) {
-                elements.vodHistoryContainer.style.display = 'block';
-                elements.vodHistoryList.innerHTML = '';
+                elements.vodHistoryContainer.style.display = 'block'; elements.vodHistoryList.innerHTML = '';
                 vods.forEach(item => {
-                    const div = document.createElement('div');
-                    div.className = 'history-vod-card';
+                    const div = document.createElement('div'); div.className = 'history-vod-card';
                     const thumb = item.thumb || "https://vod-secure.twitch.tv/_404/404_processing_320x180.png";
                     const streamer = item.streamer || "VOD";
                     div.innerHTML = `<img src="${thumb}" class="history-vod-thumb"><div class="history-vod-info"><div class="history-vod-title">${item.display}</div><div class="history-vod-streamer">${streamer}</div></div><div class="delete-item-btn" onclick="removeFromHistory(event, '${item.term}')">✖</div>`;
@@ -398,17 +389,14 @@
             } else { elements.vodHistoryContainer.style.display = 'none'; }
 
             if (channels.length > 0) {
-                elements.chanHistoryContainer.style.display = 'block';
-                elements.chanHistoryList.innerHTML = '';
+                elements.chanHistoryContainer.style.display = 'block'; elements.chanHistoryList.innerHTML = '';
                 channels.forEach(item => {
-                    const tag = document.createElement('div');
-                    tag.className = 'history-tag';
+                    const tag = document.createElement('div'); tag.className = 'history-tag';
                     tag.innerHTML = `👤 ${item.display} <span class="delete-item-btn" style="margin-left: 5px; width: 18px; height: 18px; background: transparent;" onclick="removeFromHistory(event, '${item.term}')">✖</span>`;
                     tag.onclick = () => { document.getElementById('channelInput').value = item.term; switchTab('channel'); searchStreamer(); };
                     elements.chanHistoryList.appendChild(tag);
                 });
-                const clearBtn = document.createElement('div');
-                clearBtn.className = 'history-clear';
+                const clearBtn = document.createElement('div'); clearBtn.className = 'history-clear';
                 clearBtn.innerHTML = `🗑️ ${txt('btn_clear')} Tout`;
                 clearBtn.onclick = () => { searchHistory = searchHistory.filter(h => h.type === 'vod'); localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory)); renderHistory(); };
                 elements.chanHistoryList.appendChild(clearBtn);
@@ -418,8 +406,7 @@
         const elementsCache = { status: document.getElementById('status-msg'), vodList: document.getElementById('vod-list'), videoContainer: document.getElementById('video-container'), optionsBar: document.getElementById('options-bar'), vlcSection: document.getElementById('vlc-section'), qualitySelect: document.getElementById('qualitySelect'), vlcInput: document.getElementById('vlcLink'), liveArea: document.getElementById('live-area'), langSelect: document.getElementById('langSelect') };
 
         function setLanguage(lang) {
-            currentLang = lang;
-            if (elementsCache.langSelect) elementsCache.langSelect.value = lang;
+            currentLang = lang; if (elementsCache.langSelect) elementsCache.langSelect.value = lang;
             document.querySelectorAll('[data-lang]').forEach(el => { const key = el.getAttribute('data-lang'); if (translations[lang][key]) el.textContent = translations[lang][key]; });
             document.querySelectorAll('[data-placeholder]').forEach(el => { const key = el.getAttribute('data-placeholder'); if (translations[lang][key]) el.placeholder = translations[lang][key]; });
             renderHistory();
@@ -431,47 +418,36 @@
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             if (tab === 'discovery') { 
-                document.querySelector('.tab-btn:nth-child(1)').classList.add('active'); 
-                document.getElementById('tab-discovery').classList.add('active'); 
+                document.querySelector('.tab-btn:nth-child(1)').classList.add('active'); document.getElementById('tab-discovery').classList.add('active'); 
                 elementsCache.vodList.style.display = 'none'; elementsCache.liveArea.innerHTML = '';
                 if(document.getElementById('discovery-followed').innerHTML === '') loadDiscovery();
             } else if (tab === 'channel') { 
-                document.querySelector('.tab-btn:nth-child(2)').classList.add('active'); 
-                document.getElementById('tab-channel').classList.add('active'); 
+                document.querySelector('.tab-btn:nth-child(2)').classList.add('active'); document.getElementById('tab-channel').classList.add('active'); 
                 if (elementsCache.vodList.children.length > 0) elementsCache.vodList.style.display = 'grid'; 
             } else { 
-                document.querySelector('.tab-btn:nth-child(3)').classList.add('active'); 
-                document.getElementById('tab-direct').classList.add('active'); 
+                document.querySelector('.tab-btn:nth-child(3)').classList.add('active'); document.getElementById('tab-direct').classList.add('active'); 
                 elementsCache.vodList.style.display = 'none'; elementsCache.liveArea.innerHTML = ''; 
             }
         }
 
         function getTimeSince(dateString, durationSeconds) {
             const endDate = new Date(new Date(dateString).getTime() + durationSeconds * 1000);
-            const diff = new Date() - endDate;
-            if (diff < 0) return ""; 
+            const diff = new Date() - endDate; if (diff < 0) return ""; 
             const minutes = Math.floor(diff / 60000), hours = Math.floor(diff / 3600000), days = Math.floor(diff / 86400000);
-            if (days > 0) return `${days} ${txt('day')}`;
-            if (hours > 0) return `${hours} ${txt('hour')}`;
-            return `${minutes} ${txt('min')}`;
+            if (days > 0) return `${days} ${txt('day')}`; if (hours > 0) return `${hours} ${txt('hour')}`; return `${minutes} ${txt('min')}`;
         }
 
         async function searchStreamer(autoPlay = false) {
             const channelName = document.getElementById('channelInput').value.trim();
             if (!channelName) return setStatus("err_missing", 'error');
-            
             setStatus("loading", 'loading'); elementsCache.vodList.style.display = 'none'; elementsCache.liveArea.innerHTML = ''; hidePlayer();
-
             try {
                 const [resVods, resLive] = await Promise.all([fetch(`${API_URL}/api/get-channel-videos?name=${channelName}`), fetch(`${API_URL}/api/get-live?name=${channelName}`)]);
                 const dataLive = await resLive.json(); const dataVods = await resVods.json();
-
                 const hasAvatar = dataLive.avatar || dataVods.avatar;
                 if (dataLive.error && dataVods.error && !hasAvatar) { setStatus("not_found", 'error'); return; }
-
                 saveToHistory(channelName, 'channel', channelName);
                 const avatarUrl = hasAvatar || "https://static-cdn.jtvnw.net/user-default-pictures-uv/cdd517fe-def4-11e9-948e-784f43822e80-profile_image-70x70.png";
-                
                 if (!dataLive.error) {
                     const thumbUrl = dataLive.thumbnail ? dataLive.thumbnail.replace('{width}', '320').replace('{height}', '180') : "";
                     elementsCache.liveArea.innerHTML = `<div class="live-card online"><img src="${avatarUrl}" class="live-avatar"><div class="live-info"><span class="live-badge">${txt('live_on')}</span><div class="live-title">${dataLive.title}</div><div class="live-game">${dataLive.game}</div><button class="btn-primary" style="margin-top:10px; width:100%" onclick="watchLive()">${txt('btn_watch_live')}</button></div>${thumbUrl ? `<div class="live-thumb-container"><img src="${thumbUrl}" class="live-thumb"></div>` : ''}</div>`;
@@ -484,9 +460,7 @@
                     }
                     elementsCache.liveArea.innerHTML = `<div class="live-card"><img src="${avatarUrl}" class="live-avatar" style="border-color:#555"><div class="live-info"><span class="live-badge" style="background:#555">${txt('offline')}</span><div class="live-title" style="color:#aaa; margin-top:5px;">${offlineText}</div></div></div>`;
                 }
-
-                if (dataVods.error) { setStatus("no_vod", 'error'); } 
-                else {
+                if (dataVods.error) { setStatus("no_vod", 'error'); } else {
                     setStatus("vods_found", 'success'); elementsCache.vodList.innerHTML = ''; elementsCache.vodList.style.display = 'grid';
                     dataVods.videos.forEach(vod => {
                         const card = document.createElement('div'); card.className = 'vod-card';
@@ -524,42 +498,32 @@
             const rawInput = document.getElementById('vodInput').value;
             const id = (rawInput.match(/\d{8,}/) || [])[0];
             if (!id) return setStatus("ID invalide", 'error');
-            
             setStatus("loading_vod", 'loading');
             let title = null, thumb = null, streamer = null;
             try {
-                const res = await fetch('https://gql.twitch.tv/gql', {
-                    method: 'POST', headers: { 'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko' },
-                    body: JSON.stringify({ query: `query { video(id: "${id}") { title, owner { displayName }, previewThumbnailURL(height: 180, width: 320) } }` })
-                });
+                const res = await fetch('https://gql.twitch.tv/gql', { method: 'POST', headers: { 'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko' }, body: JSON.stringify({ query: `query { video(id: "${id}") { title, owner { displayName }, previewThumbnailURL(height: 180, width: 320) } }` }) });
                 const json = await res.json();
-                if (json.data && json.data.video) {
-                    title = json.data.video.title; streamer = json.data.video.owner?.displayName || "Inconnu"; thumb = json.data.video.previewThumbnailURL;
-                }
+                if (json.data && json.data.video) { title = json.data.video.title; streamer = json.data.video.owner?.displayName || "Inconnu"; thumb = json.data.video.previewThumbnailURL; }
             } catch (e) {}
             fetchAndPlayVod(id, title, thumb, streamer);
         }
 
         function scrollToPlayer() { document.getElementById('video-container').scrollIntoView({ behavior: "smooth", block: "start" }); }
-
         function setupPlayer(links) {
             currentLinks = links; elementsCache.qualitySelect.innerHTML = '';
             for (const [q, url] of Object.entries(links)) { const opt = document.createElement('option'); opt.value = q; opt.textContent = q.toUpperCase().replace('CHUNKED', 'SOURCE'); elementsCache.qualitySelect.appendChild(opt); }
             elementsCache.optionsBar.style.display = 'flex'; elementsCache.videoContainer.style.display = 'block'; elementsCache.vlcSection.style.display = 'flex'; changeQuality();
         }
-
         function changeQuality() {
             const rawUrl = currentLinks[elementsCache.qualitySelect.value]; if (!rawUrl) return;
             elementsCache.vlcInput.value = rawUrl; const video = document.getElementById('player');
             let timeToRestore = isNewVodLoad ? 0 : video.currentTime;
             if (isNewVodLoad && currentVodId) { const savedTime = localStorage.getItem('vod_progress_' + currentVodId); if (savedTime) timeToRestore = parseFloat(savedTime); }
             isNewVodLoad = false; 
-
             const restoreAndPlay = () => { if (timeToRestore > 0) video.currentTime = timeToRestore; video.play().catch(()=>{}); };
             if (Hls.isSupported()) { if (hls) hls.destroy(); hls = new Hls(); hls.loadSource(rawUrl); hls.attachMedia(video); hls.on(Hls.Events.MANIFEST_PARSED, restoreAndPlay); 
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) { video.src = rawUrl; video.addEventListener('loadedmetadata', restoreAndPlay, { once: true }); }
         }
-
         function hidePlayer() { elementsCache.optionsBar.style.display = 'none'; elementsCache.videoContainer.style.display = 'none'; elementsCache.vlcSection.style.display = 'none'; if (hls) hls.destroy(); player.stop(); }
         function togglePiP() { const v = document.getElementById('player'); if (document.pictureInPictureEnabled) document.pictureInPictureElement ? document.exitPictureInPicture() : v.requestPictureInPicture(); }
         function downloadM3U8() { const l = document.createElement('a'); l.href = URL.createObjectURL(new Blob([`#EXTM3U\n#EXTINF:-1,Twitch\n${elementsCache.vlcInput.value}`],{type:'audio/x-mpegurl'})); l.download='video.m3u'; l.click(); }
