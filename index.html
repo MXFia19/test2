@@ -185,8 +185,13 @@
             </div>
             <div id="discovery-followed" class="stream-grid"></div>
 
-            <div class="history-title" style="margin: 30px 0 10px 0;">🔥 Top Streams (FR)</div>
-            <div id="discovery-top" class="stream-grid"></div>
+<div style="display:flex; justify-content:space-between; align-items:center; margin: 30px 0 10px 0; flex-wrap: wrap; gap: 10px;">
+                <div class="history-title" style="margin: 0;">🔥 Top Streams</div>
+                <div class="tabs" style="margin-bottom: 0; padding: 3px; background: #1f1f23;">
+                    <button id="btn-top-fr" class="tab-btn active" style="padding: 5px 12px; font-size: 0.8rem;" onclick="loadTopStreams('fr')">🇫🇷 FR</button>
+                    <button id="btn-top-world" class="tab-btn" style="padding: 5px 12px; font-size: 0.8rem;" onclick="loadTopStreams('all')">🌍 Monde</button>
+                </div>
+            </div>            <div id="discovery-top" class="stream-grid"></div>
         </div>
 
         <div id="tab-channel" class="tab-content">
