@@ -240,15 +240,15 @@
             if (/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)) document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
         });
 
-        // --- AUTHENTIFICATION TWITCH ---
+// --- AUTHENTIFICATION TWITCH ---
         function loginTwitch() {
-            // Construit l'URL de retour (l'URL actuelle de votre site)
-            const redirectUri = window.location.origin + window.location.pathname;
+            // ON FORCE LA VRAIE ADRESSE VERCEL ICI :
+            const redirectUri = "https://test2-fawn-eta.vercel.app/"; 
+            
             // Demande d'accès en mode "Implicit" (response_type=token)
             const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${HELIX_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=user:read:follows`;
             window.location.href = authUrl;
         }
-
         function logoutTwitch() {
             localStorage.removeItem('twitch_token');
             loadDiscovery(); // Recharge la page découverte
