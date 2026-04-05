@@ -47,13 +47,17 @@
         .btn-secondary { background: #3a3a40; font-size: 0.9rem; width: 100%; margin-top: 10px; }
 
         .stream-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; margin-top: 10px; }
-        .stream-card { background: #26262c; border-radius: 12px; overflow: hidden; cursor: pointer; text-align: left; transition: transform 0.2s; border: 1px solid transparent; position: relative; }
+        .stream-card { background: #26262c; border-radius: 12px; overflow: hidden; cursor: pointer; text-align: left; transition: transform 0.2s; border: 1px solid transparent; display: flex; flex-direction: column; }
         .stream-card:hover { transform: scale(1.03); border-color: var(--primary); box-shadow: 0 4px 15px rgba(145, 70, 255, 0.2); }
+        
+        /* CORRECTION DU BADGE VIEWER */
+        .stream-thumb-wrapper { position: relative; line-height: 0; }
         .stream-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #111; }
+        .stream-badge { position: absolute; bottom: 8px; right: 8px; background: rgba(233,25,22,0.95); color: white; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.5); pointer-events: none; }
+        
         .stream-info { padding: 10px; }
         .stream-title { font-size: 0.85rem; font-weight: 700; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 5px; line-height: 1.2; color: white;}
         .stream-name { font-size: 0.75rem; color: var(--primary); font-weight: 600; }
-        .stream-badge { position: absolute; bottom: 70px; right: 8px; background: rgba(233,25,22,0.95); color: white; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
 
         .history-title { font-size: 0.9rem; color: #bf94ff; margin: 15px 0 10px 0; font-weight: 700; text-align: left; padding-left: 5px; }
         #vod-history-container { display: none; margin-bottom: 25px; width: 100%; animation: fadeIn 0.4s; }
@@ -170,16 +174,16 @@
 
         <div id="tab-discovery" class="tab-content active">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
-                <div class="history-title" style="margin: 0;">💜 Vos Chaînes Suivies</div>
+                <div class="history-title" style="margin: 0;" data-lang="followed_channels">💜 Vos Chaînes Suivies</div>
                 <div id="discovery-controls" style="display: flex; gap: 10px;"></div>
             </div>
             <div id="discovery-followed" class="stream-grid"></div>
 
             <div style="display:flex; justify-content:space-between; align-items:center; margin: 30px 0 10px 0; flex-wrap: wrap; gap: 10px;">
-                <div class="history-title" style="margin: 0;">🔥 Top Streams</div>
+                <div class="history-title" style="margin: 0;" data-lang="top_streams">🔥 Top Streams</div>
                 <div class="tabs" style="margin-bottom: 0; padding: 3px; background: #1f1f23;">
-                    <button id="btn-top-fr" class="tab-btn active" style="padding: 5px 12px; font-size: 0.8rem;" onclick="loadTopStreams('fr')">🇫🇷 FR</button>
-                    <button id="btn-top-world" class="tab-btn" style="padding: 5px 12px; font-size: 0.8rem;" onclick="loadTopStreams('all')">🌍 Monde</button>
+                    <button id="btn-top-fr" class="tab-btn active" style="padding: 5px 12px; font-size: 0.8rem;" onclick="loadTopStreams('fr')" data-lang="top_fr">🇫🇷 FR</button>
+                    <button id="btn-top-world" class="tab-btn" style="padding: 5px 12px; font-size: 0.8rem;" onclick="loadTopStreams('all')" data-lang="top_world">🌍 Monde</button>
                 </div>
             </div>
             <div id="discovery-top" class="stream-grid"></div>
@@ -210,10 +214,16 @@
         const API_URL = "https://test2.kurzmathis4.workers.dev";
         const HELIX_CLIENT_ID = "uyvqdqrz614y5wx5l4kev6c4ln7u9a"; 
 
+        // DICTIONNAIRE MIS À JOUR
         const translations = {
-            fr: { title: "Regarder Twitch sans Sub", tab_discovery: "🌟 Découverte", tab_id: "Lien / ID", tab_streamer: "Streamer", mobile_title: "📱 Mode Mobile", mobile_desc: "Astuce : utilisez Outplayer, VLC ou Infuse.", ph_id: "ID ou Lien de la VOD", btn_unlock: "Déverrouiller", ph_streamer: "Nom du Streamer", btn_search: "🔍 Chercher", status_ready: "Prêt.", lbl_quality: "Qualité :", btn_pip: "📺 Activer PiP", btn_dl: "📥 Fichier M3U8", lbl_link: "Lien externe :", btn_copy: "Copier", err_missing: "Nom manquant.", loading: "Chargement...", live_on: "EN DIRECT", btn_watch_live: "▶️ Regarder le Live", no_vod: "Aucune VOD trouvée.", vods_found: "VODs trouvées.", err_network: "Erreur réseau.", err_live: "Erreur Live.", loading_vod: "Lancement VOD...", vod_ready: "VOD en lecture !", err_conn: "Erreur connexion.", copied: "Lien copié !", offline: "HORS LIGNE", offline_since: "Hors ligne depuis : ", day: "j", hour: "h", min: "min", lbl_vod_history: "VODs récemment regardées :", lbl_channel_history: "Streamers récents :", btn_clear: "Effacer", not_found: "❌ Streamer introuvable.", offline_msg: "Pas de stream en cours." },
-            en: { title: "Watch Twitch No Sub", tab_discovery: "🌟 Discovery", tab_id: "Link / ID", tab_streamer: "Streamer", mobile_title: "📱 Mobile Mode", mobile_desc: "Tip: use Outplayer, VLC or Infuse.", ph_id: "VOD ID or Link", btn_unlock: "Unlock", ph_streamer: "Streamer Name", btn_search: "🔍 Search", status_ready: "Ready.", lbl_quality: "Quality:", btn_pip: "📺 Toggle PiP", btn_dl: "📥 Download (File)", lbl_link: "External Link:", btn_copy: "Copy", err_missing: "Name missing.", loading: "Loading...", live_on: "LIVE NOW", btn_watch_live: "▶️ Watch Live", no_vod: "No VODs found.", vods_found: "VODs found.", err_network: "Network error.", err_live: "Live error.", loading_vod: "Loading VOD...", vod_ready: "VOD Playing!", err_conn: "Connection error.", copied: "Link copied!", offline: "OFFLINE", offline_since: "Offline since: ", day: "d", hour: "h", min: "min", lbl_vod_history: "Recently watched VODs:", lbl_channel_history: "Recent Streamers:", btn_clear: "Clear", not_found: "❌ Streamer not found.", offline_msg: "Stream is offline." },
-            es: { title: "Ver Twitch sin Sub", tab_discovery: "🌟 Descubrir", tab_id: "Enlace / ID", tab_streamer: "Streamer", mobile_title: "📱 Modo Móvil", mobile_desc: "Consejo: usa Outplayer, VLC o Infuse.", ph_id: "ID o Enlace VOD", btn_unlock: "Desbloquear", ph_streamer: "Nombre del Streamer", btn_search: "🔍 Buscar", status_ready: "Listo.", lbl_quality: "Calidad:", btn_pip: "📺 Modo PiP", btn_dl: "📥 Descargar", lbl_link: "Enlace externo:", btn_copy: "Copiar", err_missing: "Falta el nombre.", loading: "Cargando...", live_on: "EN VIVO", btn_watch_live: "▶️ Ver Directo", no_vod: "No se encontraron VODs.", vods_found: "VODs encontrados.", err_network: "Error de red.", err_live: "Error de directo.", loading_vod: "Cargando VOD...", vod_ready: "VOD Reproduciendo!", err_conn: "Error de conexión.", copied: "Enlace copiado!", offline: "DESCONECTADO", offline_since: "Desconectado desde: ", day: "d", hour: "h", min: "min", lbl_vod_history: "VODs recientes:", lbl_channel_history: "Streamers recientes:", btn_clear: "Borrar", not_found: "❌ Streamer no encontrado.", offline_msg: "No hay directo en curso." }
+            fr: { title: "Regarder Twitch sans Sub", tab_discovery: "🌟 Découverte", tab_id: "Lien / ID", tab_streamer: "Streamer", mobile_title: "📱 Mode Mobile", mobile_desc: "Astuce : utilisez Outplayer, VLC ou Infuse.", ph_id: "ID ou Lien de la VOD", btn_unlock: "Déverrouiller", ph_streamer: "Nom du Streamer", btn_search: "🔍 Chercher", status_ready: "Prêt.", lbl_quality: "Qualité :", btn_pip: "📺 Activer PiP", btn_dl: "📥 Fichier M3U8", lbl_link: "Lien externe :", btn_copy: "Copier", err_missing: "Nom manquant.", loading: "Chargement...", live_on: "EN DIRECT", btn_watch_live: "▶️ Regarder le Live", no_vod: "Aucune VOD trouvée.", vods_found: "VODs trouvées.", err_network: "Erreur réseau.", err_live: "Erreur Live.", loading_vod: "Lancement VOD...", vod_ready: "VOD en lecture !", err_conn: "Erreur connexion.", copied: "Lien copié !", offline: "HORS LIGNE", offline_since: "Hors ligne depuis : ", day: "j", hour: "h", min: "min", lbl_vod_history: "VODs récemment regardées :", lbl_channel_history: "Streamers récents :", btn_clear: "Effacer", not_found: "❌ Streamer introuvable.", offline_msg: "Pas de stream en cours.",
+            followed_channels: "💜 Vos Chaînes Suivies", top_streams: "🔥 Top Streams", btn_refresh: "🔄 Actualiser", btn_logout: "Déconnexion", login_prompt: "Connectez-vous pour retrouver facilement vos chaînes préférées et synchroniser votre historique.", btn_login_twitch: "🟣 Se connecter avec Twitch", login_required: "Veuillez vous connecter pour afficher les streams en cours.", loading_channels: "Chargement de vos chaînes...", loading_top: "Chargement du Top...", err_loading: "Erreur lors du chargement.", no_live: "Aucune chaîne en live pour le moment.", session_expired: "Session expirée. Veuillez vous reconnecter.", top_fr: "🇫🇷 FR", top_world: "🌍 Monde" },
+            
+            en: { title: "Watch Twitch No Sub", tab_discovery: "🌟 Discovery", tab_id: "Link / ID", tab_streamer: "Streamer", mobile_title: "📱 Mobile Mode", mobile_desc: "Tip: use Outplayer, VLC or Infuse.", ph_id: "VOD ID or Link", btn_unlock: "Unlock", ph_streamer: "Streamer Name", btn_search: "🔍 Search", status_ready: "Ready.", lbl_quality: "Quality:", btn_pip: "📺 Toggle PiP", btn_dl: "📥 Download (File)", lbl_link: "External Link:", btn_copy: "Copy", err_missing: "Name missing.", loading: "Loading...", live_on: "LIVE NOW", btn_watch_live: "▶️ Watch Live", no_vod: "No VODs found.", vods_found: "VODs found.", err_network: "Network error.", err_live: "Live error.", loading_vod: "Loading VOD...", vod_ready: "VOD Playing!", err_conn: "Connection error.", copied: "Link copied!", offline: "OFFLINE", offline_since: "Offline since: ", day: "d", hour: "h", min: "min", lbl_vod_history: "Recently watched VODs:", lbl_channel_history: "Recent Streamers:", btn_clear: "Clear", not_found: "❌ Streamer not found.", offline_msg: "Stream is offline.",
+            followed_channels: "💜 Followed Channels", top_streams: "🔥 Top Streams", btn_refresh: "🔄 Refresh", btn_logout: "Logout", login_prompt: "Log in to easily find your favorite channels and sync your history.", btn_login_twitch: "🟣 Log in with Twitch", login_required: "Please log in to view live streams.", loading_channels: "Loading your channels...", loading_top: "Loading Top...", err_loading: "Error loading data.", no_live: "No live channels at the moment.", session_expired: "Session expired. Please log in again.", top_fr: "🇫🇷 FR", top_world: "🌍 World" },
+            
+            es: { title: "Ver Twitch sin Sub", tab_discovery: "🌟 Descubrir", tab_id: "Enlace / ID", tab_streamer: "Streamer", mobile_title: "📱 Modo Móvil", mobile_desc: "Consejo: usa Outplayer, VLC o Infuse.", ph_id: "ID o Enlace VOD", btn_unlock: "Desbloquear", ph_streamer: "Nombre del Streamer", btn_search: "🔍 Buscar", status_ready: "Listo.", lbl_quality: "Calidad:", btn_pip: "📺 Modo PiP", btn_dl: "📥 Descargar", lbl_link: "Enlace externo:", btn_copy: "Copiar", err_missing: "Falta el nombre.", loading: "Cargando...", live_on: "EN VIVO", btn_watch_live: "▶️ Ver Directo", no_vod: "No se encontraron VODs.", vods_found: "VODs encontrados.", err_network: "Error de red.", err_live: "Error de directo.", loading_vod: "Cargando VOD...", vod_ready: "VOD Reproduciendo!", err_conn: "Error de conexión.", copied: "Enlace copiado!", offline: "DESCONECTADO", offline_since: "Desconectado desde: ", day: "d", hour: "h", min: "min", lbl_vod_history: "VODs recientes:", lbl_channel_history: "Streamers recientes:", btn_clear: "Borrar", not_found: "❌ Streamer no encontrado.", offline_msg: "No hay directo en curso.",
+            followed_channels: "💜 Canales Seguidos", top_streams: "🔥 Top Streams", btn_refresh: "🔄 Actualizar", btn_logout: "Cerrar sesión", login_prompt: "Inicia sesión para encontrar tus canales favoritos y sincronizar tu historial.", btn_login_twitch: "🟣 Iniciar sesión con Twitch", login_required: "Inicia sesión para ver los streams.", loading_channels: "Cargando tus canales...", loading_top: "Cargando Top...", err_loading: "Error al cargar.", no_live: "No hay canales en vivo ahora.", session_expired: "Sesión expirada. Inicia sesión de nuevo.", top_fr: "🇫🇷 FR", top_world: "🌍 Mundo" }
         };
 
         let currentLang = 'fr';
@@ -223,7 +233,7 @@
         let player = null;
         
         let searchHistory = JSON.parse(localStorage.getItem('twitch_vod_history')) || [];
-        let globalTwitchUserId = null; // Stocke l'ID Twitch si connecté
+        let globalTwitchUserId = null; 
         
         let currentVodId = null; 
         let isNewVodLoad = false;
@@ -241,7 +251,6 @@
                     if (Math.abs(video.currentTime - lastSaveTime) > 5) {
                         localStorage.setItem('vod_progress_' + currentVodId, video.currentTime);
                         lastSaveTime = video.currentTime;
-                        // Synchronise la progression avec le Cloud en tâche de fond (toutes les 5 sec max)
                         debouncedCloudSave();
                     }
                 }
@@ -258,7 +267,6 @@
             if (/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)) document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
         });
 
-        // --- AUTHENTIFICATION TWITCH ---
         function loginTwitch() {
             const redirectUri = "https://test2-fawn-eta.vercel.app/"; 
             const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${HELIX_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=user:read:follows`;
@@ -280,16 +288,13 @@
             }
         }
 
-        // --- CLOUD SYNC (KV) ---
         async function syncDataFromServer(userId) {
             try {
                 const res = await fetch(`${API_URL}/api/sync/get?userId=${userId}`);
                 const data = await res.json();
                 if (data && data.history) {
-                    // Si le cloud a un historique, on remplace le local par le cloud
                     searchHistory = data.history;
                     localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory));
-                    // Récupération des temps de VOD
                     if(data.progress) {
                         for (const [vodId, time] of Object.entries(data.progress)) {
                             localStorage.setItem('vod_progress_' + vodId, time);
@@ -301,39 +306,19 @@
         }
 
         async function syncDataToServer() {
-            if (!globalTwitchUserId) return; // Ne sauvegarde que s'il est connecté
-            
-            // On compile l'historique et les temps des VODs en local pour les envoyer
+            if (!globalTwitchUserId) return; 
             let progressData = {};
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
-                if (key.startsWith('vod_progress_')) {
-                    progressData[key.replace('vod_progress_', '')] = parseFloat(localStorage.getItem(key));
-                }
+                if (key.startsWith('vod_progress_')) progressData[key.replace('vod_progress_', '')] = parseFloat(localStorage.getItem(key));
             }
-
-            const payload = {
-                userId: globalTwitchUserId,
-                data: { history: searchHistory, progress: progressData }
-            };
-
-            try {
-                await fetch(`${API_URL}/api/sync/post`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-            } catch (e) { console.error("Erreur Sync POST:", e); }
+            const payload = { userId: globalTwitchUserId, data: { history: searchHistory, progress: progressData } };
+            try { await fetch(`${API_URL}/api/sync/post`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); } catch (e) {}
         }
 
-        // Anti-spam pour la sauvegarde Cloud
         let syncTimeout;
-        function debouncedCloudSave() {
-            clearTimeout(syncTimeout);
-            syncTimeout = setTimeout(syncDataToServer, 5000); // Attend 5 sec d'inactivité avant de sauvegarder
-        }
+        function debouncedCloudSave() { clearTimeout(syncTimeout); syncTimeout = setTimeout(syncDataToServer, 5000); }
 
-        // --- SYSTÈME DÉCOUVERTE ---
         async function loadDiscovery() {
             const followedDiv = document.getElementById('discovery-followed');
             const topDiv = document.getElementById('discovery-top');
@@ -344,19 +329,19 @@
                 controlsDiv.innerHTML = ``; 
                 followedDiv.innerHTML = `
                 <div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; background: rgba(0,0,0,0.3); border-radius: 12px; border: 1px dashed #333;">
-                    <p style="margin-bottom: 15px; color: #aaa; font-weight: 600;">Connectez-vous pour retrouver facilement vos chaînes préférées et synchroniser votre historique.</p>
-                    <button class="btn-primary" onclick="loginTwitch()" style="background: #9146ff; font-size: 1.1rem; padding: 15px 30px;">🟣 Se connecter avec Twitch</button>
+                    <p style="margin-bottom: 15px; color: #aaa; font-weight: 600;" data-lang="login_prompt">${txt('login_prompt')}</p>
+                    <button class="btn-primary" onclick="loginTwitch()" style="background: #9146ff; font-size: 1.1rem; padding: 15px 30px;" data-lang="btn_login_twitch">${txt('btn_login_twitch')}</button>
                 </div>`;
-                topDiv.innerHTML = `<span style='color:#777; grid-column: 1 / -1; text-align: center;'>Veuillez vous connecter pour afficher les streams en cours.</span>`;
+                topDiv.innerHTML = `<span style='color:#777; grid-column: 1 / -1; text-align: center;' data-lang="login_required">${txt('login_required')}</span>`;
                 return;
             }
 
             controlsDiv.innerHTML = `
-                <button class="btn-secondary" style="width:auto; padding: 5px 10px; margin:0;" onclick="loadDiscovery()">🔄 Actualiser</button>
-                <button class="btn-secondary" style="width:auto; padding: 5px 10px; margin:0; background: rgba(255, 79, 77, 0.2); color: var(--danger); border: 1px solid var(--danger);" onclick="logoutTwitch()">Déconnexion</button>
+                <button class="btn-secondary" style="width:auto; padding: 5px 10px; margin:0;" onclick="loadDiscovery()" data-lang="btn_refresh">${txt('btn_refresh')}</button>
+                <button class="btn-secondary" style="width:auto; padding: 5px 10px; margin:0; background: rgba(255, 79, 77, 0.2); color: var(--danger); border: 1px solid var(--danger);" onclick="logoutTwitch()" data-lang="btn_logout">${txt('btn_logout')}</button>
             `;
 
-            followedDiv.innerHTML = '<span class="status-loading">Chargement de vos chaînes...</span>';
+            followedDiv.innerHTML = `<span class="status-loading" data-lang="loading_channels">${txt('loading_channels')}</span>`;
             loadTopStreams(currentTopLang);
 
             try {
@@ -366,7 +351,6 @@
                 const userData = await userRes.json();
                 const userId = userData.data[0].id;
                 
-                // NOUVEAU: Si on vient de se connecter, on télécharge la sauvegarde Cloud !
                 if (globalTwitchUserId !== userId) {
                     globalTwitchUserId = userId;
                     await syncDataFromServer(userId);
@@ -377,7 +361,7 @@
                 followedDiv.innerHTML = renderStreamGrid(dataFollowed.data);
             } catch (e) {
                 localStorage.removeItem('twitch_token'); 
-                followedDiv.innerHTML = '<span class="status-error" style="grid-column: 1 / -1;">Session expirée. Veuillez vous reconnecter.</span>';
+                followedDiv.innerHTML = `<span class="status-error" style="grid-column: 1 / -1;" data-lang="session_expired">${txt('session_expired')}</span>`;
                 topDiv.innerHTML = ''; controlsDiv.innerHTML = '';
                 setTimeout(loadDiscovery, 2000); 
             }
@@ -392,7 +376,7 @@
             document.getElementById('btn-top-fr').classList.remove('active'); document.getElementById('btn-top-world').classList.remove('active');
             if(lang === 'fr') document.getElementById('btn-top-fr').classList.add('active'); else document.getElementById('btn-top-world').classList.add('active');
 
-            topDiv.innerHTML = '<span class="status-loading">Chargement du Top...</span>';
+            topDiv.innerHTML = `<span class="status-loading" data-lang="loading_top">${txt('loading_top')}</span>`;
             let url = `https://api.twitch.tv/helix/streams?first=20`;
             if (lang === 'fr') url += `&language=fr`;
 
@@ -400,18 +384,20 @@
                 const resTop = await fetch(url, { headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': HELIX_CLIENT_ID } });
                 const dataTop = await resTop.json();
                 topDiv.innerHTML = renderStreamGrid(dataTop.data);
-            } catch (e) { topDiv.innerHTML = '<span class="status-error" style="grid-column: 1 / -1;">Erreur lors du chargement.</span>'; }
+            } catch (e) { topDiv.innerHTML = `<span class="status-error" style="grid-column: 1 / -1;" data-lang="err_loading">${txt('err_loading')}</span>`; }
         }
 
         function renderStreamGrid(streams) {
-            if (!streams || streams.length === 0) return "<span style='color:#aaa; grid-column: 1 / -1;'>Aucune chaîne en live pour le moment.</span>";
+            if (!streams || streams.length === 0) return `<span style='color:#aaa; grid-column: 1 / -1;' data-lang="no_live">${txt('no_live')}</span>`;
             return streams.map(s => {
                 const thumb = s.thumbnail_url.replace('{width}', '320').replace('{height}', '180');
                 const viewers = s.viewer_count >= 1000 ? (s.viewer_count/1000).toFixed(1) + 'k' : s.viewer_count;
                 return `
                 <div class="stream-card" onclick="playFromDiscovery('${s.user_login}')">
-                    <img src="${thumb}" class="stream-thumb">
-                    <span class="stream-badge">🔴 ${viewers}</span>
+                    <div class="stream-thumb-wrapper">
+                        <img src="${thumb}" class="stream-thumb">
+                        <span class="stream-badge">🔴 ${viewers}</span>
+                    </div>
                     <div class="stream-info">
                         <div class="stream-title" title="${s.title}">${s.title}</div>
                         <div class="stream-name">${s.user_name} • ${s.game_name}</div>
@@ -422,21 +408,16 @@
 
         function playFromDiscovery(channelName) { document.getElementById('channelInput').value = channelName; switchTab('channel'); searchStreamer(true); }
 
-        // --- GESTION HISTORIQUE (Avec Sync) ---
         function saveToHistory(term, type, displayTitle, extraData = {}) {
             searchHistory = searchHistory.filter(item => item.term.toLowerCase() !== term.toLowerCase());
             searchHistory.unshift({ term, type, display: displayTitle || term, ...extraData }); 
             if (searchHistory.length > 20) searchHistory.pop();
-            localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory)); 
-            renderHistory();
-            debouncedCloudSave(); // Sauvegarde Cloud !
+            localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory)); renderHistory(); debouncedCloudSave(); 
         }
 
         function removeFromHistory(event, term) {
             event.stopPropagation(); searchHistory = searchHistory.filter(item => item.term !== term);
-            localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory)); 
-            renderHistory();
-            debouncedCloudSave(); // Sauvegarde Cloud !
+            localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory)); renderHistory(); debouncedCloudSave(); 
         }
 
         function renderHistory() {
@@ -475,7 +456,7 @@
 
         function setLanguage(lang) {
             currentLang = lang; if (elementsCache.langSelect) elementsCache.langSelect.value = lang;
-            document.querySelectorAll('[data-lang]').forEach(el => { const key = el.getAttribute('data-lang'); if (translations[lang][key]) el.textContent = translations[lang][key]; });
+            document.querySelectorAll('[data-lang]').forEach(el => { const key = el.getAttribute('data-lang'); if (translations[lang][key]) el.innerHTML = translations[lang][key]; });
             document.querySelectorAll('[data-placeholder]').forEach(el => { const key = el.getAttribute('data-placeholder'); if (translations[lang][key]) el.placeholder = translations[lang][key]; });
             renderHistory();
         }
@@ -534,7 +515,7 @@
                         const card = document.createElement('div'); card.className = 'vod-card';
                         card.onclick = () => fetchAndPlayVod(vod.id, vod.title, vod.previewThumbnailURL, channelName);
                         const duration = Math.floor(vod.lengthSeconds / 60) + ' min', date = new Date(vod.publishedAt).toLocaleDateString(currentLang === 'fr' ? 'fr-FR' : 'en-US');
-                        card.innerHTML = `<img src="${vod.previewThumbnailURL}" class="vod-thumb"><div class="vod-info"><div class="vod-title">${vod.title}</div><div class="vod-meta">${date} • ${duration}</div></div>`;
+                        card.innerHTML = `<div class="stream-thumb-wrapper"><img src="${vod.previewThumbnailURL}" class="vod-thumb"></div><div class="vod-info"><div class="vod-title">${vod.title}</div><div class="vod-meta">${date} • ${duration}</div></div>`;
                         elementsCache.vodList.appendChild(card);
                     });
                 }
