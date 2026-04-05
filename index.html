@@ -46,7 +46,6 @@
         .btn-primary { background: var(--primary); }
         .btn-secondary { background: #3a3a40; font-size: 0.9rem; width: 100%; margin-top: 10px; }
 
-        /* --- STYLES DÉCOUVERTE --- */
         .stream-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; margin-top: 10px; }
         .stream-card { background: #26262c; border-radius: 12px; overflow: hidden; cursor: pointer; text-align: left; transition: transform 0.2s; border: 1px solid transparent; position: relative; }
         .stream-card:hover { transform: scale(1.03); border-color: var(--primary); box-shadow: 0 4px 15px rgba(145, 70, 255, 0.2); }
@@ -56,7 +55,6 @@
         .stream-name { font-size: 0.75rem; color: var(--primary); font-weight: 600; }
         .stream-badge { position: absolute; bottom: 70px; right: 8px; background: rgba(233,25,22,0.95); color: white; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
 
-        /* --- STYLES HISTORIQUES --- */
         .history-title { font-size: 0.9rem; color: #bf94ff; margin: 15px 0 10px 0; font-weight: 700; text-align: left; padding-left: 5px; }
         #vod-history-container { display: none; margin-bottom: 25px; width: 100%; animation: fadeIn 0.4s; }
         #vod-history-list { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 15px; scrollbar-width: thin; scrollbar-color: var(--primary) #111; }
@@ -79,7 +77,6 @@
         .delete-item-btn { background: rgba(255, 79, 77, 0.15); color: var(--danger); width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; margin-left: auto; transition: 0.2s; flex-shrink: 0; }
         .delete-item-btn:hover { background: var(--danger); color: white; }
 
-        /* --- STYLES CARTES --- */
         .live-card { background: rgba(0,0,0,0.2); border: 1px solid #3a3a40; border-radius: 12px; padding: 15px; margin-bottom: 25px; text-align: left; animation: fadeIn 0.5s; display: flex; gap: 15px; flex-wrap: wrap; align-items: center; }
         .live-card.online { border-color: #e91916; background: rgba(233, 25, 22, 0.05); }
         .live-thumb-container { position: relative; width: 180px; aspect-ratio: 16/9; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
@@ -109,25 +106,18 @@
     </style>
 
     <script>
-        // --- 1. MAGIE DU POPUP (Doit être exécuté en tout premier) ---
-        // Si cette page est ouverte dans un popup de connexion Twitch et contient le jeton
+        // --- POPUP HANDLER ---
         if (window.opener && window.location.hash.includes('access_token=')) {
-            // Envoie le jeton à la fenêtre principale
             window.opener.postMessage(window.location.hash, window.location.origin);
-            // Ferme le popup immédiatement
             window.close();
         }
-
-        // --- 2. ÉCOUTEUR DU POPUP (Sur la fenêtre principale) ---
         window.addEventListener('message', (event) => {
-            // Vérification de sécurité pour s'assurer que le message vient bien de notre propre site
             if (event.origin !== window.location.origin) return; 
-
             if (typeof event.data === 'string' && event.data.includes('access_token=')) {
                 const token = new URLSearchParams(event.data.substring(1)).get('access_token');
                 if (token) {
                     localStorage.setItem('twitch_token', token);
-                    loadDiscovery(); // Met à jour la page Découverte sans recharger la page
+                    loadDiscovery(); 
                 }
             }
         });
@@ -185,13 +175,14 @@
             </div>
             <div id="discovery-followed" class="stream-grid"></div>
 
-<div style="display:flex; justify-content:space-between; align-items:center; margin: 30px 0 10px 0; flex-wrap: wrap; gap: 10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin: 30px 0 10px 0; flex-wrap: wrap; gap: 10px;">
                 <div class="history-title" style="margin: 0;">🔥 Top Streams</div>
                 <div class="tabs" style="margin-bottom: 0; padding: 3px; background: #1f1f23;">
                     <button id="btn-top-fr" class="tab-btn active" style="padding: 5px 12px; font-size: 0.8rem;" onclick="loadTopStreams('fr')">🇫🇷 FR</button>
                     <button id="btn-top-world" class="tab-btn" style="padding: 5px 12px; font-size: 0.8rem;" onclick="loadTopStreams('all')">🌍 Monde</button>
                 </div>
-            </div>            <div id="discovery-top" class="stream-grid"></div>
+            </div>
+            <div id="discovery-top" class="stream-grid"></div>
         </div>
 
         <div id="tab-channel" class="tab-content">
@@ -226,10 +217,14 @@
         };
 
         let currentLang = 'fr';
+        let currentTopLang = 'fr';
         let currentLinks = {};
         let hls = null;
         let player = null;
+        
         let searchHistory = JSON.parse(localStorage.getItem('twitch_vod_history')) || [];
+        let globalTwitchUserId = null; // Stocke l'ID Twitch si connecté
+        
         let currentVodId = null; 
         let isNewVodLoad = false;
         let lastSaveTime = 0;
@@ -246,55 +241,97 @@
                     if (Math.abs(video.currentTime - lastSaveTime) > 5) {
                         localStorage.setItem('vod_progress_' + currentVodId, video.currentTime);
                         lastSaveTime = video.currentTime;
+                        // Synchronise la progression avec le Cloud en tâche de fond (toutes les 5 sec max)
+                        debouncedCloudSave();
                     }
                 }
             });
 
-            checkTwitchAuthFallback(); // Vérifie s'il y a un token si on a navigué directement sans popup
+            checkTwitchAuthFallback();
             renderHistory();
 
             const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('id')) { 
-                document.getElementById('vodInput').value = urlParams.get('id'); switchTab('direct'); searchVodById(); 
-            } else if (urlParams.get('channel')) { 
-                document.getElementById('channelInput').value = urlParams.get('channel'); switchTab('channel'); searchStreamer(true); 
-            } else { 
-                switchTab('discovery'); 
-            }
+            if (urlParams.get('id')) { document.getElementById('vodInput').value = urlParams.get('id'); switchTab('direct'); searchVodById(); } 
+            else if (urlParams.get('channel')) { document.getElementById('channelInput').value = urlParams.get('channel'); switchTab('channel'); searchStreamer(true); } 
+            else { switchTab('discovery'); }
             
             if (/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)) document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
         });
 
-            function loginTwitch() {
+        // --- AUTHENTIFICATION TWITCH ---
+        function loginTwitch() {
             const redirectUri = "https://test2-fawn-eta.vercel.app/"; 
-            // On utilise VOTRE vrai Client ID ici !
-            const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=uyvqdqrz614y5wx5l4kev6c4ln7u9a&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=user:read:follows`;
-            
-            const width = 500;
-            const height = 700;
-            const left = (screen.width / 2) - (width / 2);
-            const top = (screen.height / 2) - (height / 2);
+            const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${HELIX_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=user:read:follows`;
+            const width = 500, height = 700, left = (screen.width / 2) - (width / 2), top = (screen.height / 2) - (height / 2);
             window.open(authUrl, 'TwitchLogin', `width=${width},height=${height},top=${top},left=${left}`);
         }
 
         function logoutTwitch() {
             localStorage.removeItem('twitch_token');
+            globalTwitchUserId = null;
             loadDiscovery(); 
         }
 
         function checkTwitchAuthFallback() {
-            // Uniquement si l'utilisateur a ouvert le lien d'auth dans le même onglet sans faire exprès
             const hash = window.location.hash;
             if (hash.includes('access_token=') && !window.opener) {
                 const token = new URLSearchParams(hash.substring(1)).get('access_token');
-                if (token) {
-                    localStorage.setItem('twitch_token', token);
-                    window.history.replaceState(null, null, window.location.pathname); 
-                }
+                if (token) { localStorage.setItem('twitch_token', token); window.history.replaceState(null, null, window.location.pathname); }
             }
         }
 
-let currentTopLang = 'fr'; // Garde en mémoire le choix (FR ou Monde)
+        // --- CLOUD SYNC (KV) ---
+        async function syncDataFromServer(userId) {
+            try {
+                const res = await fetch(`${API_URL}/api/sync/get?userId=${userId}`);
+                const data = await res.json();
+                if (data && data.history) {
+                    // Si le cloud a un historique, on remplace le local par le cloud
+                    searchHistory = data.history;
+                    localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory));
+                    // Récupération des temps de VOD
+                    if(data.progress) {
+                        for (const [vodId, time] of Object.entries(data.progress)) {
+                            localStorage.setItem('vod_progress_' + vodId, time);
+                        }
+                    }
+                    renderHistory();
+                }
+            } catch (e) { console.error("Erreur Sync GET:", e); }
+        }
+
+        async function syncDataToServer() {
+            if (!globalTwitchUserId) return; // Ne sauvegarde que s'il est connecté
+            
+            // On compile l'historique et les temps des VODs en local pour les envoyer
+            let progressData = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('vod_progress_')) {
+                    progressData[key.replace('vod_progress_', '')] = parseFloat(localStorage.getItem(key));
+                }
+            }
+
+            const payload = {
+                userId: globalTwitchUserId,
+                data: { history: searchHistory, progress: progressData }
+            };
+
+            try {
+                await fetch(`${API_URL}/api/sync/post`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            } catch (e) { console.error("Erreur Sync POST:", e); }
+        }
+
+        // Anti-spam pour la sauvegarde Cloud
+        let syncTimeout;
+        function debouncedCloudSave() {
+            clearTimeout(syncTimeout);
+            syncTimeout = setTimeout(syncDataToServer, 5000); // Attend 5 sec d'inactivité avant de sauvegarder
+        }
 
         // --- SYSTÈME DÉCOUVERTE ---
         async function loadDiscovery() {
@@ -307,7 +344,7 @@ let currentTopLang = 'fr'; // Garde en mémoire le choix (FR ou Monde)
                 controlsDiv.innerHTML = ``; 
                 followedDiv.innerHTML = `
                 <div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; background: rgba(0,0,0,0.3); border-radius: 12px; border: 1px dashed #333;">
-                    <p style="margin-bottom: 15px; color: #aaa; font-weight: 600;">Connectez-vous pour retrouver facilement vos chaînes préférées.</p>
+                    <p style="margin-bottom: 15px; color: #aaa; font-weight: 600;">Connectez-vous pour retrouver facilement vos chaînes préférées et synchroniser votre historique.</p>
                     <button class="btn-primary" onclick="loginTwitch()" style="background: #9146ff; font-size: 1.1rem; padding: 15px 30px;">🟣 Se connecter avec Twitch</button>
                 </div>`;
                 topDiv.innerHTML = `<span style='color:#777; grid-column: 1 / -1; text-align: center;'>Veuillez vous connecter pour afficher les streams en cours.</span>`;
@@ -320,8 +357,6 @@ let currentTopLang = 'fr'; // Garde en mémoire le choix (FR ou Monde)
             `;
 
             followedDiv.innerHTML = '<span class="status-loading">Chargement de vos chaînes...</span>';
-            
-            // On charge le Top Streams en parallèle avec la dernière langue choisie
             loadTopStreams(currentTopLang);
 
             try {
@@ -330,10 +365,15 @@ let currentTopLang = 'fr'; // Garde en mémoire le choix (FR ou Monde)
                 
                 const userData = await userRes.json();
                 const userId = userData.data[0].id;
+                
+                // NOUVEAU: Si on vient de se connecter, on télécharge la sauvegarde Cloud !
+                if (globalTwitchUserId !== userId) {
+                    globalTwitchUserId = userId;
+                    await syncDataFromServer(userId);
+                }
 
                 const resFollowed = await fetch(`https://api.twitch.tv/helix/streams/followed?user_id=${userId}&first=20`, { headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': HELIX_CLIENT_ID } });
                 const dataFollowed = await resFollowed.json();
-                
                 followedDiv.innerHTML = renderStreamGrid(dataFollowed.data);
             } catch (e) {
                 localStorage.removeItem('twitch_token'); 
@@ -343,22 +383,16 @@ let currentTopLang = 'fr'; // Garde en mémoire le choix (FR ou Monde)
             }
         }
 
-        // --- GESTION DU TOP STREAMS (FR / MONDE) ---
         async function loadTopStreams(lang) {
             currentTopLang = lang;
             const topDiv = document.getElementById('discovery-top');
             const token = localStorage.getItem('twitch_token');
             if (!token) return;
 
-            // Mise à jour de l'apparence des boutons
-            document.getElementById('btn-top-fr').classList.remove('active');
-            document.getElementById('btn-top-world').classList.remove('active');
-            if(lang === 'fr') document.getElementById('btn-top-fr').classList.add('active');
-            else document.getElementById('btn-top-world').classList.add('active');
+            document.getElementById('btn-top-fr').classList.remove('active'); document.getElementById('btn-top-world').classList.remove('active');
+            if(lang === 'fr') document.getElementById('btn-top-fr').classList.add('active'); else document.getElementById('btn-top-world').classList.add('active');
 
             topDiv.innerHTML = '<span class="status-loading">Chargement du Top...</span>';
-            
-            // Si c'est 'fr', on filtre par langue. Sinon (Monde), on demande tout court !
             let url = `https://api.twitch.tv/helix/streams?first=20`;
             if (lang === 'fr') url += `&language=fr`;
 
@@ -366,9 +400,7 @@ let currentTopLang = 'fr'; // Garde en mémoire le choix (FR ou Monde)
                 const resTop = await fetch(url, { headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': HELIX_CLIENT_ID } });
                 const dataTop = await resTop.json();
                 topDiv.innerHTML = renderStreamGrid(dataTop.data);
-            } catch (e) {
-                topDiv.innerHTML = '<span class="status-error" style="grid-column: 1 / -1;">Erreur lors du chargement.</span>';
-            }
+            } catch (e) { topDiv.innerHTML = '<span class="status-error" style="grid-column: 1 / -1;">Erreur lors du chargement.</span>'; }
         }
 
         function renderStreamGrid(streams) {
@@ -390,17 +422,21 @@ let currentTopLang = 'fr'; // Garde en mémoire le choix (FR ou Monde)
 
         function playFromDiscovery(channelName) { document.getElementById('channelInput').value = channelName; switchTab('channel'); searchStreamer(true); }
 
-        // --- GESTION HISTORIQUE ---
+        // --- GESTION HISTORIQUE (Avec Sync) ---
         function saveToHistory(term, type, displayTitle, extraData = {}) {
             searchHistory = searchHistory.filter(item => item.term.toLowerCase() !== term.toLowerCase());
             searchHistory.unshift({ term, type, display: displayTitle || term, ...extraData }); 
             if (searchHistory.length > 20) searchHistory.pop();
-            localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory)); renderHistory();
+            localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory)); 
+            renderHistory();
+            debouncedCloudSave(); // Sauvegarde Cloud !
         }
 
         function removeFromHistory(event, term) {
             event.stopPropagation(); searchHistory = searchHistory.filter(item => item.term !== term);
-            localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory)); renderHistory();
+            localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory)); 
+            renderHistory();
+            debouncedCloudSave(); // Sauvegarde Cloud !
         }
 
         function renderHistory() {
@@ -430,7 +466,7 @@ let currentTopLang = 'fr'; // Garde en mémoire le choix (FR ou Monde)
                 });
                 const clearBtn = document.createElement('div'); clearBtn.className = 'history-clear';
                 clearBtn.innerHTML = `🗑️ ${txt('btn_clear')} Tout`;
-                clearBtn.onclick = () => { searchHistory = searchHistory.filter(h => h.type === 'vod'); localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory)); renderHistory(); };
+                clearBtn.onclick = () => { searchHistory = searchHistory.filter(h => h.type === 'vod'); localStorage.setItem('twitch_vod_history', JSON.stringify(searchHistory)); renderHistory(); debouncedCloudSave(); };
                 elements.chanHistoryList.appendChild(clearBtn);
             } else { elements.chanHistoryContainer.style.display = 'none'; }
         }
