@@ -1,12 +1,12 @@
-// worker.js - VERSION V12 (Support AirPlay & Range Requests)
+// worker.js - VERSION V14 (Avec Cloudflare KV Sync)
 const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 
 const COMMON_HEADERS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Cache-Control, Range', // Ajout de Range
-    'Access-Control-Expose-Headers': 'Content-Length, Content-Range', // Important pour le lecteur
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Access-Control-Allow-Headers': 'Content-Type, Cache-Control, Range',
+    'Access-Control-Expose-Headers': 'Content-Length, Content-Range',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     'Referer': 'https://www.twitch.tv/',
     'Origin': 'https://www.twitch.tv'
 };
@@ -22,12 +22,16 @@ export default {
         
         try {
             switch (url.pathname) {
-                case '/': return new Response("Twitch Proxy", { headers: COMMON_HEADERS });
+                case '/': return new Response("Twitch Proxy V14 - Sync Ready", { headers: COMMON_HEADERS });
                 case '/api/get-live': return await handleGetLive(url, workerOrigin);
                 case '/api/get-channel-videos': return await handleGetVideos(url);
                 case '/api/get-m3u8': return await handleGetM3U8(url, workerOrigin);
-                // MODIFICATION IMPORTANTE : On passe 'request' ici
                 case '/api/proxy': return await handleProxy(url, request);
+                
+                // Routes Sync (Sauvegarde Cloud)
+                case '/api/sync/get': return await handleSyncGet(url, env);
+                case '/api/sync/post': return await handleSyncPost(request, env);
+                
                 default: return new Response("Not Found", { status: 404, headers: COMMON_HEADERS });
             }
         } catch (e) {
@@ -36,8 +40,34 @@ export default {
     }
 };
 
-// --- HANDLERS ---
+// --- SYSTÈME DE SYNCHRONISATION CLOUD (KV) ---
+async function handleSyncGet(url, env) {
+    if (!env.TWITCH_DATA) return jsonError("Erreur Serveur: KV 'TWITCH_DATA' non lié au Worker.", 500);
+    const userId = url.searchParams.get('userId');
+    if (!userId) return jsonError("User ID manquant", 400);
 
+    const data = await env.TWITCH_DATA.get(`user_${userId}`, { type: "json" });
+    return jsonResponse(data || { history: [], progress: {} });
+}
+
+async function handleSyncPost(request, env) {
+    if (request.method !== 'POST') return jsonError("Method Not Allowed", 405);
+    if (!env.TWITCH_DATA) return jsonError("Erreur Serveur: KV 'TWITCH_DATA' non lié au Worker.", 500);
+    
+    try {
+        const body = await request.json();
+        const userId = body.userId;
+        if (!userId) return jsonError("User ID manquant", 400);
+        
+        // On sauvegarde les données (historique et temps des VODs) pour cet utilisateur
+        await env.TWITCH_DATA.put(`user_${userId}`, JSON.stringify(body.data));
+        return jsonResponse({ success: true });
+    } catch (e) {
+        return jsonError("JSON invalide", 400);
+    }
+}
+
+// --- HANDLERS CLASSIQUES ---
 async function handleGetVideos(url) {
     const name = url.searchParams.get('name');
     const cursor = url.searchParams.get('cursor');
@@ -82,12 +112,9 @@ async function handleGetLive(url, workerOrigin) {
         const manualThumbnail = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-640x360.jpg`;
 
         return jsonResponse({ 
-            links, 
-            best: links["Source"] || links["Auto"],
-            title: info?.title || "Live", 
-            game: info?.game?.displayName || "",
-            thumbnail: manualThumbnail,
-            avatar: avatar || "" 
+            links, best: links["Source"] || links["Auto"],
+            title: info?.title || "Live", game: info?.game?.displayName || "",
+            thumbnail: manualThumbnail, avatar: avatar || "" 
         });
     } catch (e) { return jsonError(e.message, 404); }
 }
@@ -96,7 +123,6 @@ async function handleGetM3U8(url, workerOrigin) {
     const vodId = url.searchParams.get('id');
     if (!vodId) return jsonError("ID manquant");
 
-    // PLAN A
     try {
         const token = await getAccessToken(vodId, false);
         if (token) {
@@ -109,11 +135,9 @@ async function handleGetM3U8(url, workerOrigin) {
         }
     } catch (e) {}
 
-    // PLAN B
     try {
         const data = await twitchGQL(`query { video(id: "${vodId}") { seekPreviewsURL } }`);
         const seekUrl = data.data?.video?.seekPreviewsURL;
-        
         if (seekUrl) {
             const rawLinks = await storyboardHack(seekUrl);
             if (Object.keys(rawLinks).length > 0) {
@@ -129,15 +153,14 @@ async function handleGetM3U8(url, workerOrigin) {
                         }
                     });
                 });
-                return jsonResponse({ links: proxiedLinks, best: proxiedLinks["Source"] || proxiedLinks["Auto"], info: "Mode Backup Active" });
+                return jsonResponse({ links: proxiedLinks, best: proxiedLinks["Source"] || proxiedLinks["Auto"], info: "Backup" });
             }
         }
     } catch (e) {}
 
-    return jsonError("VOD introuvable ou protégée", 404);
+    return jsonError("VOD introuvable", 404);
 }
 
-// --- PROXY COMPATIBLE AIRPLAY ---
 async function handleProxy(url, request) {
     const target = url.searchParams.get('url');
     if (!target) return new Response("URL manquante", { status: 400 });
@@ -145,20 +168,14 @@ async function handleProxy(url, request) {
     const isVod = url.searchParams.get('isVod') === 'true';
     const workerOrigin = url.origin;
 
-    // 1. Préparation des Headers pour Twitch (On transmet le Range si demandé par la TV)
     let fetchHeaders = { ...COMMON_HEADERS };
-    if (request.headers.get("Range")) {
-        fetchHeaders["Range"] = request.headers.get("Range");
-    }
+    if (request.headers.get("Range")) fetchHeaders["Range"] = request.headers.get("Range");
 
     const res = await fetch(target, { headers: fetchHeaders });
-
-    // 2. Préparation des Headers de réponse
     const newHeaders = new Headers(res.headers);
     newHeaders.set("Access-Control-Allow-Origin", "*");
-    newHeaders.set("Access-Control-Expose-Headers", "*"); // Important pour AirPlay
+    newHeaders.set("Access-Control-Expose-Headers", "*"); 
 
-    // Cas 1 : Playlist M3U8 (On doit réécrire les liens)
     if (target.includes('.m3u8')) {
         newHeaders.set("Content-Type", "application/vnd.apple.mpegurl");
         const text = await res.text();
@@ -169,34 +186,18 @@ async function handleProxy(url, request) {
             const line = l.trim();
             if (!line || line.startsWith('#')) return line;
             const full = line.startsWith('http') ? line : base + line;
-            if (line.includes('.m3u8') || isVod) {
-                return `${workerOrigin}/api/proxy?url=${encodeURIComponent(full)}&isVod=${isVod}`;
-            }
+            if (line.includes('.m3u8') || isVod) return `${workerOrigin}/api/proxy?url=${encodeURIComponent(full)}&isVod=${isVod}`;
             return full; 
         }).join('\n');
-
         return new Response(newText, { status: res.status, headers: newHeaders });
     }
-
-    // Cas 2 : Segment vidéo TS (On stream avec support Range)
-    // On renvoie exactement le status code de Twitch (200 ou 206 Partial Content)
-    return new Response(res.body, { 
-        status: res.status, 
-        headers: newHeaders 
-    });
+    return new Response(res.body, { status: res.status, headers: newHeaders });
 }
-
-// --- OUTILS ---
 
 async function twitchGQL(query, variables = {}) {
     const res = await fetch('https://gql.twitch.tv/gql', {
         method: 'POST',
-        headers: {
-            'Client-ID': CLIENT_ID,
-            'Content-Type': 'application/json',
-            'User-Agent': COMMON_HEADERS['User-Agent'],
-            'Device-ID': 'MkMq8a9' + Math.random().toString(36).substring(2, 15)
-        },
+        headers: { 'Client-ID': CLIENT_ID, 'Content-Type': 'application/json', 'User-Agent': COMMON_HEADERS['User-Agent'], 'Device-ID': 'MkMq8a9' + Math.random().toString(36).substring(2, 15) },
         body: JSON.stringify({ query, variables })
     });
     if (!res.ok) throw new Error(`GQL ${res.status}`);
@@ -207,7 +208,6 @@ async function getAccessToken(id, isLive) {
     const query = isLive 
         ? `query { streamPlaybackAccessToken(channelName: "${id}", params: {platform: "web", playerBackend: "mediaplayer", playerType: "site"}) { value signature } }`
         : `query { videoPlaybackAccessToken(id: "${id}", params: {platform: "web", playerBackend: "mediaplayer", playerType: "site"}) { value signature } }`;
-    
     const data = await twitchGQL(query);
     return isLive ? data.data?.streamPlaybackAccessToken : data.data?.videoPlaybackAccessToken;
 }
