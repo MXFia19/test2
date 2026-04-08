@@ -27,7 +27,7 @@
         .plyr--video .plyr__control--overlaid { background: rgba(0, 0, 0, 0.6); border-radius: 12px; }
         .plyr--video .plyr__control--overlaid:hover { background: #9146ff; }
 
-        #langSelect { position: absolute; top: 15px; right: 15px; background: #26262c; border: 1px solid #3a3a40; color: #888; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; z-index: 10; width: auto !important; min-width: 60px; }
+        #langSelect { background: #26262c; border: 1px solid #3a3a40; color: #888; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; width: auto !important; min-width: 60px; }
         h1 { font-weight: 800; margin-bottom: 20px; color: #bf94ff; font-size: 1.5rem; margin-top: 0; }
         
         .mobile-only { display: none; }
@@ -50,7 +50,6 @@
         .stream-card { background: #26262c; border-radius: 12px; overflow: hidden; cursor: pointer; text-align: left; transition: transform 0.2s; border: 1px solid transparent; display: flex; flex-direction: column; }
         .stream-card:hover { transform: scale(1.03); border-color: var(--primary); box-shadow: 0 4px 15px rgba(145, 70, 255, 0.2); }
         
-        /* CORRECTION DU BADGE VIEWER */
         .stream-thumb-wrapper { position: relative; line-height: 0; }
         .stream-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #111; }
         .stream-badge { position: absolute; bottom: 8px; right: 8px; background: rgba(233,25,22,0.95); color: white; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.5); pointer-events: none; }
@@ -241,6 +240,7 @@
         let hls = null;
         let player = null;
         
+        let useProxy = localStorage.getItem('twitch_use_proxy') !== 'false'; // <-- GESTION DU PROXY
         let searchHistory = JSON.parse(localStorage.getItem('twitch_vod_history')) || [];
         let globalTwitchUserId = null; 
         
@@ -251,6 +251,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             const userLang = navigator.language.slice(0, 2);
             if (translations[userLang]) setLanguage(userLang); else setLanguage('fr');
+            
+            document.getElementById('proxyToggle').checked = useProxy; // <-- COCHE LA CASE AU DÉMARRAGE
             
             player = new Plyr('#player', { controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'airplay', 'fullscreen'], settings: ['speed'], fullscreen: { enabled: true, fallback: true, iosNative: true } });
             
@@ -275,6 +277,12 @@
             
             if (/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)) document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
         });
+
+        // <-- NOUVELLE FONCTION PROXY -->
+        function toggleProxyPref() {
+            useProxy = document.getElementById('proxyToggle').checked;
+            localStorage.setItem('twitch_use_proxy', useProxy);
+        }
 
         function loginTwitch() {
             const redirectUri = "https://test2-fawn-eta.vercel.app/"; 
@@ -500,7 +508,7 @@
             if (!channelName) return setStatus("err_missing", 'error');
             setStatus("loading", 'loading'); elementsCache.vodList.style.display = 'none'; elementsCache.liveArea.innerHTML = ''; hidePlayer();
             try {
-                const [resVods, resLive] = await Promise.all([fetch(`${API_URL}/api/get-channel-videos?name=${channelName}`), fetch(`${API_URL}/api/get-live?name=${channelName}`)]);
+                const [resVods, resLive] = await Promise.all([fetch(`${API_URL}/api/get-channel-videos?name=${channelName}`), fetch(`${API_URL}/api/get-live?name=${channelName}&proxy=${useProxy}`)]);
                 const dataLive = await resLive.json(); const dataVods = await resVods.json();
                 const hasAvatar = dataLive.avatar || dataVods.avatar;
                 if (dataLive.error && dataVods.error && !hasAvatar) { setStatus("not_found", 'error'); return; }
@@ -534,7 +542,8 @@
         async function watchLive() {
             const channelName = document.getElementById('channelInput').value.trim();
             try {
-                const response = await fetch(`${API_URL}/api/get-live?name=${channelName}`);
+                // <-- AJOUT DE proxy=useProxy
+                const response = await fetch(`${API_URL}/api/get-live?name=${channelName}&proxy=${useProxy}`);
                 const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
                 currentVodId = null; setupPlayer(data.links); setStatus("Live: " + data.title, 'success'); scrollToPlayer();
@@ -544,7 +553,8 @@
         async function fetchAndPlayVod(id, title, thumb = null, streamer = null) {
             setStatus("loading_vod", 'loading');
             try {
-                const response = await fetch(`${API_URL}/api/get-m3u8?id=${id}`);
+                // <-- AJOUT DE proxy=useProxy
+                const response = await fetch(`${API_URL}/api/get-m3u8?id=${id}&proxy=${useProxy}`);
                 const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
                 saveToHistory(id, 'vod', title || `VOD ${id}`, { thumb: thumb, streamer: streamer });
