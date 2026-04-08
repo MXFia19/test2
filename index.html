@@ -154,7 +154,11 @@
         </div>
 
         <div id="status-msg" data-lang="status_ready">Prêt.</div>
-        <div id="video-container"><video id="player" playsinline controls crossorigin></video></div>
+        
+        <div id="video-container">
+            <video id="player" playsinline webkit-playsinline controls crossorigin></video>
+        </div>
+        
         <div id="options-bar">
             <label data-lang="lbl_quality">Qualité :</label>
             <select id="qualitySelect" onchange="changeQuality()"></select>
@@ -574,7 +578,22 @@
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) { video.src = rawUrl; video.addEventListener('loadedmetadata', restoreAndPlay, { once: true }); }
         }
         function hidePlayer() { elementsCache.optionsBar.style.display = 'none'; elementsCache.videoContainer.style.display = 'none'; elementsCache.vlcSection.style.display = 'none'; if (hls) hls.destroy(); player.stop(); }
-        function togglePiP() { const v = document.getElementById('player'); if (document.pictureInPictureEnabled) document.pictureInPictureElement ? document.exitPictureInPicture() : v.requestPictureInPicture(); }
+        function togglePiP() { 
+            const v = document.getElementById('player'); 
+            
+            // 1. Essayer la méthode spécifique à Apple (iOS / Safari)
+            if (v.webkitSupportsPresentationMode && typeof v.webkitSetPresentationMode === "function") {
+                v.webkitSetPresentationMode(v.webkitPresentationMode === "picture-in-picture" ? "inline" : "picture-in-picture");
+            } 
+            // 2. Essayer la méthode standard (PC / Android / Autres navigateurs)
+            else if (document.pictureInPictureEnabled) {
+                document.pictureInPictureElement ? document.exitPictureInPicture() : v.requestPictureInPicture();
+            } 
+            // 3. Fallback
+            else {
+                alert("Le mode PiP est bloqué par iOS dans ce mode. Mettez la vidéo en plein écran et utilisez l'icône PiP native d'Apple en haut à gauche !");
+            }
+        }
         function downloadM3U8() { const l = document.createElement('a'); l.href = URL.createObjectURL(new Blob([`#EXTM3U\n#EXTINF:-1,Twitch\n${elementsCache.vlcInput.value}`],{type:'audio/x-mpegurl'})); l.download='video.m3u'; l.click(); }
         function copyLink() { elementsCache.vlcInput.select(); navigator.clipboard.writeText(elementsCache.vlcInput.value); alert(txt('copied')); }
         function openInVLC_Mobile() { window.location.href = 'vlc://' + elementsCache.vlcInput.value; }
