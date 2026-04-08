@@ -1,4 +1,4 @@
-// worker.js - VERSION V14 (Avec Cloudflare KV Sync)
+// worker.js - VERSION V15 (Cloudflare KV Sync + Option Proxy)
 const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 
 const COMMON_HEADERS = {
@@ -22,7 +22,7 @@ export default {
         
         try {
             switch (url.pathname) {
-                case '/': return new Response("Twitch Proxy V14 - Sync Ready", { headers: COMMON_HEADERS });
+                case '/': return new Response("Twitch Proxy V15 - Sync & Proxy Toggle Ready", { headers: COMMON_HEADERS });
                 case '/api/get-live': return await handleGetLive(url, workerOrigin);
                 case '/api/get-channel-videos': return await handleGetVideos(url);
                 case '/api/get-m3u8': return await handleGetM3U8(url, workerOrigin);
@@ -59,7 +59,6 @@ async function handleSyncPost(request, env) {
         const userId = body.userId;
         if (!userId) return jsonError("User ID manquant", 400);
         
-        // On sauvegarde les données (historique et temps des VODs) pour cet utilisateur
         await env.TWITCH_DATA.put(`user_${userId}`, JSON.stringify(body.data));
         return jsonResponse({ success: true });
     } catch (e) {
@@ -90,7 +89,7 @@ async function handleGetVideos(url) {
 
 async function handleGetLive(url, workerOrigin) {
     const name = url.searchParams.get('name'); if (!name) return jsonError("Nom manquant"); const login = name.trim().toLowerCase();
-    const useProxy = url.searchParams.get('proxy') !== 'false'; // Par défaut à true
+    const useProxy = url.searchParams.get('proxy') !== 'false';
     try {
         const token = await getAccessToken(login, true); if (!token) return jsonError("Offline", 404);
         const res = await fetch(`https://usher.ttvnw.net/api/channel/hls/${login}.m3u8?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&playlist_include_framerate=true&segment_preference=4&sig=${token.signature}&token=${encodeURIComponent(token.value)}`, { headers: COMMON_HEADERS });
@@ -106,7 +105,7 @@ async function handleGetM3U8(url, workerOrigin) {
     const vodId = url.searchParams.get('id'); if (!vodId) return jsonError("ID manquant");
     const useProxy = url.searchParams.get('proxy') !== 'false';
     
-    // --- 1. Tentative Normale (Sub-only unlock) ---
+    // --- 1. Tentative Normale ---
     try {
         const token = await getAccessToken(vodId, false);
         if (token) {
@@ -118,15 +117,13 @@ async function handleGetM3U8(url, workerOrigin) {
         }
     } catch (e) {}
     
-    // --- 2. Plan de Secours (Backup / Storyboard Hack) ---
+    // --- 2. Plan de Secours ---
     try {
         const data = await twitchGQL(`query { video(id: "${vodId}") { seekPreviewsURL } }`); const seekUrl = data.data?.video?.seekPreviewsURL;
         if (seekUrl) {
             const rawLinks = await storyboardHack(seekUrl);
             if (Object.keys(rawLinks).length > 0) {
                 let finalLinks = {}; 
-                
-                // Si on veut le proxy, on formate l'URL. Sinon, on donne le lien direct brut.
                 finalLinks["Auto"] = useProxy ? `${workerOrigin}/api/proxy?url=${encodeURIComponent(Object.values(rawLinks)[0])}&isVod=true` : Object.values(rawLinks)[0];
                 
                 ['Source', '1080p60', '1080p30', '720p60', '720p30', '480p30', '360p30', '160p30', 'audio_only'].forEach(key => { 
@@ -144,6 +141,33 @@ async function handleGetM3U8(url, workerOrigin) {
     return jsonError("VOD introuvable", 404);
 }
 
+// --- LE PROXY POUR CONTOURNER CORS ET LES BLOCAGES ---
+async function handleProxy(url, request) {
+    const target = url.searchParams.get('url'); if (!target) return new Response("URL manquante", { status: 400 });
+    const isVod = url.searchParams.get('isVod') === 'true', workerOrigin = url.origin;
+    
+    let fetchHeaders = { ...COMMON_HEADERS }; 
+    if (request.headers.get("Range")) fetchHeaders["Range"] = request.headers.get("Range");
+    
+    const res = await fetch(target, { headers: fetchHeaders }); 
+    const newHeaders = new Headers(res.headers); 
+    newHeaders.set("Access-Control-Allow-Origin", "*"); 
+    newHeaders.set("Access-Control-Expose-Headers", "*"); 
+    
+    if (target.includes('.m3u8')) {
+        newHeaders.set("Content-Type", "application/vnd.apple.mpegurl");
+        const finalUrl = res.url, base = finalUrl.substring(0, finalUrl.lastIndexOf('/') + 1);
+        const newText = (await res.text()).split('\n').map(l => {
+            const line = l.trim(); if (!line || line.startsWith('#')) return line;
+            const full = line.startsWith('http') ? line : base + line;
+            return (line.includes('.m3u8') || isVod) ? `${workerOrigin}/api/proxy?url=${encodeURIComponent(full)}&isVod=${isVod}` : full;
+        }).join('\n');
+        return new Response(newText, { status: res.status, headers: newHeaders });
+    }
+    return new Response(res.body, { status: res.status, headers: newHeaders });
+}
+
+// --- FONCTIONS UTILITAIRES ---
 function parseAndProxyM3U8(content, master, workerOrigin, isVod, useProxy = true) { 
     const lines = content.split('\n'); const proxyBase = `${workerOrigin}/api/proxy?url=`; let unsorted = {}, last = ""; 
     lines.forEach(l => { 
@@ -188,26 +212,6 @@ async function storyboardHack(seekUrl) {
         }));
         return found;
     } catch(e) { return {}; }
-}
-
-function parseAndProxyM3U8(content, master, workerOrigin, isVod) {
-    const lines = content.split('\n');
-    const proxyBase = `${workerOrigin}/api/proxy?url=`;
-    let unsorted = {};
-    let last = "";
-    lines.forEach(l => {
-        if (l.includes('VIDEO="')) {
-            try { let n = l.split('VIDEO="')[1].split('"')[0]; if (n === 'chunked') n = 'Source'; last = n; } catch(e) {}
-        } else if (l.startsWith('http') && last) {
-            unsorted[last] = `${proxyBase}${encodeURIComponent(l)}&isVod=${isVod}`; last = "";
-        }
-    });
-    let sorted = {};
-    sorted["Auto"] = `${proxyBase}${encodeURIComponent(master)}&isVod=${isVod}`;
-    const displayOrder = ['Source', '1080p60', '1080p30', '720p60', '720p30', '480p30', '360p30', '160p30', 'audio_only'];
-    displayOrder.forEach(key => { Object.keys(unsorted).forEach(k => { if (k.toLowerCase().includes(key.toLowerCase())) { sorted[k] = unsorted[k]; delete unsorted[k]; } }); });
-    Object.assign(sorted, unsorted);
-    return sorted;
 }
 
 function jsonResponse(obj) { return new Response(JSON.stringify(obj), { headers: { ...COMMON_HEADERS, 'Content-Type': 'application/json' } }); }
