@@ -130,7 +130,12 @@
 <body>
 
     <div class="container">
-        <select id="langSelect" onchange="setLanguage(this.value)"><option value="fr">FR</option><option value="en">EN</option><option value="es">ES</option></select>
+        <div style="position: absolute; top: 15px; right: 15px; display: flex; gap: 10px; align-items: center; z-index: 10;">
+            <label style="font-size: 0.75rem; color: #888; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px;" title="Désactiver pour économiser le serveur (pratique pour VLC)">
+                <input type="checkbox" id="proxyToggle" onchange="toggleProxyPref()"> Proxy
+            </label>
+            <select id="langSelect" style="position: static;" onchange="setLanguage(this.value)"><option value="fr">FR</option><option value="en">EN</option><option value="es">ES</option></select>
+        </div>
         <h1 data-lang="title">Twitch VOD Unblocker</h1>
         
         <div class="tabs">
