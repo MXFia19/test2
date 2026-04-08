@@ -105,21 +105,39 @@ async function handleGetLive(url, workerOrigin) {
 async function handleGetM3U8(url, workerOrigin) {
     const vodId = url.searchParams.get('id'); if (!vodId) return jsonError("ID manquant");
     const useProxy = url.searchParams.get('proxy') !== 'false';
+    
+    // --- 1. Tentative Normale (Sub-only unlock) ---
     try {
         const token = await getAccessToken(vodId, false);
         if (token) {
             const res = await fetch(`https://usher.ttvnw.net/vod/${vodId}.m3u8?nauth=${token.value}&nauthsig=${token.signature}&allow_source=true&player_backend=mediaplayer`, { headers: COMMON_HEADERS });
-            if (res.ok) { const links = parseAndProxyM3U8(await res.text(), res.url, workerOrigin, true, useProxy); return jsonResponse({ links, best: links["Source"] || links["Auto"] }); }
+            if (res.ok) { 
+                const links = parseAndProxyM3U8(await res.text(), res.url, workerOrigin, true, useProxy); 
+                return jsonResponse({ links, best: links["Source"] || links["Auto"] }); 
+            }
         }
     } catch (e) {}
+    
+    // --- 2. Plan de Secours (Backup / Storyboard Hack) ---
     try {
         const data = await twitchGQL(`query { video(id: "${vodId}") { seekPreviewsURL } }`); const seekUrl = data.data?.video?.seekPreviewsURL;
         if (seekUrl) {
             const rawLinks = await storyboardHack(seekUrl);
             if (Object.keys(rawLinks).length > 0) {
-                let proxiedLinks = {}; proxiedLinks["Auto"] = useProxy ? `${workerOrigin}/api/proxy?url=${encodeURIComponent(Object.values(rawLinks)[0])}&isVod=true` : Object.values(rawLinks)[0];
-                ['Source', '1080p60', '1080p30', '720p60', '720p30', '480p30', '360p30', '160p30', 'audio_only'].forEach(key => { Object.keys(rawLinks).forEach(k => { if (k.toLowerCase().includes(key.toLowerCase())) { proxiedLinks[k] = useProxy ? `${workerOrigin}/api/proxy?url=${encodeURIComponent(rawLinks[k])}&isVod=true` : rawLinks[k]; delete rawLinks[k]; } }); });
-                return jsonResponse({ links: proxiedLinks, best: proxiedLinks["Source"] || proxiedLinks["Auto"], info: "Backup" });
+                let finalLinks = {}; 
+                
+                // Si on veut le proxy, on formate l'URL. Sinon, on donne le lien direct brut.
+                finalLinks["Auto"] = useProxy ? `${workerOrigin}/api/proxy?url=${encodeURIComponent(Object.values(rawLinks)[0])}&isVod=true` : Object.values(rawLinks)[0];
+                
+                ['Source', '1080p60', '1080p30', '720p60', '720p30', '480p30', '360p30', '160p30', 'audio_only'].forEach(key => { 
+                    Object.keys(rawLinks).forEach(k => { 
+                        if (k.toLowerCase().includes(key.toLowerCase())) { 
+                            finalLinks[k] = useProxy ? `${workerOrigin}/api/proxy?url=${encodeURIComponent(rawLinks[k])}&isVod=true` : rawLinks[k]; 
+                            delete rawLinks[k]; 
+                        } 
+                    }); 
+                });
+                return jsonResponse({ links: finalLinks, best: finalLinks["Source"] || finalLinks["Auto"], info: "Backup" });
             }
         }
     } catch (e) {}
