@@ -90,14 +90,12 @@ async function handleGetVideos(url) {
 
 async function handleGetLive(url, workerOrigin) {
     const name = url.searchParams.get('name'); if (!name) return jsonError("Nom manquant"); const login = name.trim().toLowerCase();
+    const useProxy = url.searchParams.get('proxy') !== 'false'; // Par défaut à true
     try {
         const token = await getAccessToken(login, true); if (!token) return jsonError("Offline", 404);
         const res = await fetch(`https://usher.ttvnw.net/api/channel/hls/${login}.m3u8?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&playlist_include_framerate=true&segment_preference=4&sig=${token.signature}&token=${encodeURIComponent(token.value)}`, { headers: COMMON_HEADERS });
         if (!res.ok) throw new Error("Stream introuvable");
-        
-        // CORRECTION ICI : Le dernier paramètre passe à 'false' pour les Lives !
-        const links = parseAndProxyM3U8(await res.text(), res.url, workerOrigin, false);
-        
+        const links = parseAndProxyM3U8(await res.text(), res.url, workerOrigin, false, useProxy);
         const meta = await twitchGQL(`query { user(login: "${login}") { profileImageURL(width: 70) broadcastSettings { title game { displayName } } } }`);
         const info = meta.data?.user?.broadcastSettings, avatar = meta.data?.user?.profileImageURL;
         return jsonResponse({ links, best: links["Source"] || links["Auto"], title: info?.title || "Live", game: info?.game?.displayName || "", thumbnail: `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-640x360.jpg`, avatar: avatar || "" });
@@ -105,78 +103,37 @@ async function handleGetLive(url, workerOrigin) {
 }
 
 async function handleGetM3U8(url, workerOrigin) {
-    const vodId = url.searchParams.get('id');
-    if (!vodId) return jsonError("ID manquant");
-
+    const vodId = url.searchParams.get('id'); if (!vodId) return jsonError("ID manquant");
+    const useProxy = url.searchParams.get('proxy') !== 'false';
     try {
         const token = await getAccessToken(vodId, false);
         if (token) {
-            const masterUrl = `https://usher.ttvnw.net/vod/${vodId}.m3u8?nauth=${token.value}&nauthsig=${token.signature}&allow_source=true&player_backend=mediaplayer`;
-            const res = await fetch(masterUrl, { headers: COMMON_HEADERS });
-            if (res.ok) {
-                const links = parseAndProxyM3U8(await res.text(), res.url, workerOrigin, true);
-                return jsonResponse({ links, best: links["Source"] || links["Auto"] });
-            }
+            const res = await fetch(`https://usher.ttvnw.net/vod/${vodId}.m3u8?nauth=${token.value}&nauthsig=${token.signature}&allow_source=true&player_backend=mediaplayer`, { headers: COMMON_HEADERS });
+            if (res.ok) { const links = parseAndProxyM3U8(await res.text(), res.url, workerOrigin, true, useProxy); return jsonResponse({ links, best: links["Source"] || links["Auto"] }); }
         }
     } catch (e) {}
-
     try {
-        const data = await twitchGQL(`query { video(id: "${vodId}") { seekPreviewsURL } }`);
-        const seekUrl = data.data?.video?.seekPreviewsURL;
+        const data = await twitchGQL(`query { video(id: "${vodId}") { seekPreviewsURL } }`); const seekUrl = data.data?.video?.seekPreviewsURL;
         if (seekUrl) {
             const rawLinks = await storyboardHack(seekUrl);
             if (Object.keys(rawLinks).length > 0) {
-                let proxiedLinks = {};
-                const displayOrder = ['Source', '1080p60', '1080p30', '720p60', '720p30', '480p30', '360p30', '160p30', 'audio_only'];
-                proxiedLinks["Auto"] = `${workerOrigin}/api/proxy?url=${encodeURIComponent(Object.values(rawLinks)[0])}&isVod=true`;
-
-                displayOrder.forEach(key => {
-                    Object.keys(rawLinks).forEach(k => {
-                        if (k.toLowerCase().includes(key.toLowerCase())) {
-                            proxiedLinks[k] = `${workerOrigin}/api/proxy?url=${encodeURIComponent(rawLinks[k])}&isVod=true`;
-                            delete rawLinks[k];
-                        }
-                    });
-                });
+                let proxiedLinks = {}; proxiedLinks["Auto"] = useProxy ? `${workerOrigin}/api/proxy?url=${encodeURIComponent(Object.values(rawLinks)[0])}&isVod=true` : Object.values(rawLinks)[0];
+                ['Source', '1080p60', '1080p30', '720p60', '720p30', '480p30', '360p30', '160p30', 'audio_only'].forEach(key => { Object.keys(rawLinks).forEach(k => { if (k.toLowerCase().includes(key.toLowerCase())) { proxiedLinks[k] = useProxy ? `${workerOrigin}/api/proxy?url=${encodeURIComponent(rawLinks[k])}&isVod=true` : rawLinks[k]; delete rawLinks[k]; } }); });
                 return jsonResponse({ links: proxiedLinks, best: proxiedLinks["Source"] || proxiedLinks["Auto"], info: "Backup" });
             }
         }
     } catch (e) {}
-
     return jsonError("VOD introuvable", 404);
 }
 
-async function handleProxy(url, request) {
-    const target = url.searchParams.get('url');
-    if (!target) return new Response("URL manquante", { status: 400 });
-
-    const isVod = url.searchParams.get('isVod') === 'true';
-    const workerOrigin = url.origin;
-
-    let fetchHeaders = { ...COMMON_HEADERS };
-    if (request.headers.get("Range")) fetchHeaders["Range"] = request.headers.get("Range");
-
-    const res = await fetch(target, { headers: fetchHeaders });
-    const newHeaders = new Headers(res.headers);
-    newHeaders.set("Access-Control-Allow-Origin", "*");
-    newHeaders.set("Access-Control-Expose-Headers", "*"); 
-
-    if (target.includes('.m3u8')) {
-        newHeaders.set("Content-Type", "application/vnd.apple.mpegurl");
-        const text = await res.text();
-        const finalUrl = res.url; 
-        const base = finalUrl.substring(0, finalUrl.lastIndexOf('/') + 1);
-
-        const newText = text.split('\n').map(l => {
-            const line = l.trim();
-            if (!line || line.startsWith('#')) return line;
-            const full = line.startsWith('http') ? line : base + line;
-            if (line.includes('.m3u8') || isVod) return `${workerOrigin}/api/proxy?url=${encodeURIComponent(full)}&isVod=${isVod}`;
-            return full; 
-        }).join('\n');
-        return new Response(newText, { status: res.status, headers: newHeaders });
-    }
-    return new Response(res.body, { status: res.status, headers: newHeaders });
+function parseAndProxyM3U8(content, master, workerOrigin, isVod, useProxy = true) { 
+    const lines = content.split('\n'); const proxyBase = `${workerOrigin}/api/proxy?url=`; let unsorted = {}, last = ""; 
+    lines.forEach(l => { 
+        if (l.includes('VIDEO="')) { try { let n = l.split('VIDEO="')[1].split('"')[0]; if (n === 'chunked') n = 'Source'; last = n; } catch(e) {} } 
+        else if (l.startsWith('http') && last) { unsorted[last] = useProxy ? `${proxyBase}${encodeURIComponent(l)}&isVod=${isVod}` : l; last = ""; } 
+    }); 
+    let sorted = {}; sorted["Auto"] = useProxy ? `${proxyBase}${encodeURIComponent(master)}&isVod=${isVod}` : master; 
+    ['Source', '1080p60', '1080p30', '720p60', '720p30', '480p30', '360p30', '160p30', 'audio_only'].forEach(key => { Object.keys(unsorted).forEach(k => { if (k.toLowerCase().includes(key.toLowerCase())) { sorted[k] = unsorted[k]; delete unsorted[k]; } }); }); Object.assign(sorted, unsorted); return sorted; 
 }
 
 async function twitchGQL(query, variables = {}) {
