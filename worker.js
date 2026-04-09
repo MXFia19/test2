@@ -89,12 +89,18 @@ async function handleGetVideos(url) {
 
 async function handleGetLive(url, workerOrigin) {
     const name = url.searchParams.get('name'); if (!name) return jsonError("Nom manquant"); const login = name.trim().toLowerCase();
-    const useProxy = url.searchParams.get('proxy') !== 'false';
+    
+    // CORRECTION : On force TOUJOURS le proxy pour les Lives à cause des sécurités CORS de Twitch !
+    const useProxy = true; 
+    
     try {
         const token = await getAccessToken(login, true); if (!token) return jsonError("Offline", 404);
         const res = await fetch(`https://usher.ttvnw.net/api/channel/hls/${login}.m3u8?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&playlist_include_framerate=true&segment_preference=4&sig=${token.signature}&token=${encodeURIComponent(token.value)}`, { headers: COMMON_HEADERS });
         if (!res.ok) throw new Error("Stream introuvable");
+        
+        // On passe 'false' pour isVod (pour ne pas proxifier les .ts) et 'true' pour useProxy
         const links = parseAndProxyM3U8(await res.text(), res.url, workerOrigin, false, useProxy);
+        
         const meta = await twitchGQL(`query { user(login: "${login}") { profileImageURL(width: 70) broadcastSettings { title game { displayName } } } }`);
         const info = meta.data?.user?.broadcastSettings, avatar = meta.data?.user?.profileImageURL;
         return jsonResponse({ links, best: links["Source"] || links["Auto"], title: info?.title || "Live", game: info?.game?.displayName || "", thumbnail: `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-640x360.jpg`, avatar: avatar || "" });
