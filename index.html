@@ -22,10 +22,30 @@
         body { background-color: var(--dark); color: var(--text); display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
         .container { width: 100%; max-width: 900px; background: var(--card); padding: 25px; border-radius: 16px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); text-align: center; position: relative; padding-top: 50px; }
 
-        #video-container { width: 100%; margin-bottom: 20px; display: none; box-shadow: 0 10px 30px rgba(0,0,0,0.8); border: 1px solid #333; border-radius: 12px; overflow: hidden; }
+        #video-container { width: 100%; margin-bottom: 20px; display: none; box-shadow: 0 10px 30px rgba(0,0,0,0.8); border: 1px solid #333; border-radius: 12px; overflow: hidden; position: relative; }
+        
         .plyr { --plyr-color-main: #9146ff; --plyr-video-control-color: #efeff1; --plyr-video-control-background-hover: rgba(255, 255, 255, 0.15); --plyr-menu-background: #18181b; --plyr-menu-color: #efeff1; font-family: 'Inter', sans-serif; border-radius: 12px !important; }
         .plyr--video .plyr__control--overlaid { background: rgba(0, 0, 0, 0.6); border-radius: 12px; }
         .plyr--video .plyr__control--overlaid:hover { background: #9146ff; }
+
+        /* --- CHAT OVERLAY INTÉGRÉ AU LECTEUR --- */
+        #chat-overlay {
+            position: absolute; top: 0; right: 0; width: 320px;
+            height: calc(100% - 48px); /* Laisse la place aux contrôles Plyr en bas */
+            background: rgba(14, 14, 16, 0.9); z-index: 40; display: none; 
+            transition: transform 0.3s ease-in-out; transform: translateX(100%);
+            border-left: 1px solid rgba(255,255,255,0.1);
+        }
+        #chat-overlay.active { transform: translateX(0); } /* Glisse dans l'écran */
+
+        #chat-toggle-btn {
+            position: absolute; top: 15px; right: 15px; z-index: 45;
+            background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white; padding: 6px 12px; border-radius: 8px; cursor: pointer;
+            font-size: 0.85rem; font-weight: bold; display: none; /* Uniquement visible en Live */
+            backdrop-filter: blur(4px); transition: 0.2s;
+        }
+        #chat-toggle-btn:hover { background: var(--primary); border-color: var(--primary); }
 
         #langSelect { background: #26262c; border: 1px solid #3a3a40; color: #888; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; width: auto !important; min-width: 60px; }
         h1 { font-weight: 800; margin-bottom: 20px; color: #bf94ff; font-size: 1.5rem; margin-top: 0; }
@@ -104,7 +124,12 @@
         #status-msg { margin-bottom: 15px; font-weight: 600; min-height: 1.2em; font-size: 0.95rem; }
         .status-loading { color: #e6e619; } .status-success { color: #00ff88; } .status-error { color: #ff4f4d; }
 
-        @media (max-width: 600px) { .container { padding: 15px; padding-top: 45px; width: 100%; } .live-thumb-container { width: 100%; } .vlc-section div { flex-wrap: wrap; } }
+        @media (max-width: 600px) { 
+            .container { padding: 15px; padding-top: 45px; width: 100%; } 
+            .live-thumb-container { width: 100%; } 
+            .vlc-section div { flex-wrap: wrap; } 
+            #chat-overlay { width: 70%; }
+        }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 
@@ -199,7 +224,7 @@
 
         <div id="tab-channel" class="tab-content">
             <div class="search-bar">
-                <input type="text" id="channelInput" placeholder="Nom du Streamer" data-placeholder="ph_streamer" onkeydown="if(event.key==='Enter') searchStreamer()">
+                <input type="text" id="channelInput" placeholder="Streamer + Mot (Ex: squeezie horreur)" data-placeholder="ph_streamer" onkeydown="if(event.key==='Enter') searchStreamer()">
                 <button class="btn-primary" onclick="searchStreamer()" data-lang="btn_search">🔍 Chercher</button>
             </div>
             <div id="channel-history-container">
@@ -222,15 +247,14 @@
         const API_URL = "https://test2.kurzmathis4.workers.dev";
         const HELIX_CLIENT_ID = "uyvqdqrz614y5wx5l4kev6c4ln7u9a"; 
 
-        // DICTIONNAIRE MIS À JOUR
         const translations = {
-            fr: { title: "Regarder Twitch sans Sub", tab_discovery: "🌟 Découverte", tab_id: "Lien / ID", tab_streamer: "Streamer", mobile_title: "📱 Mode Mobile", mobile_desc: "Astuce : utilisez Outplayer, VLC ou Infuse.", ph_id: "ID ou Lien de la VOD", btn_unlock: "Déverrouiller", ph_streamer: "Nom du Streamer", btn_search: "🔍 Chercher", status_ready: "Prêt.", lbl_quality: "Qualité :", btn_pip: "📺 Activer PiP", btn_dl: "📥 Fichier M3U8", lbl_link: "Lien externe :", btn_copy: "Copier", err_missing: "Nom manquant.", loading: "Chargement...", live_on: "EN DIRECT", btn_watch_live: "▶️ Regarder le Live", no_vod: "Aucune VOD trouvée.", vods_found: "VODs trouvées.", err_network: "Erreur réseau.", err_live: "Erreur Live.", loading_vod: "Lancement VOD...", vod_ready: "VOD en lecture !", err_conn: "Erreur connexion.", copied: "Lien copié !", offline: "HORS LIGNE", offline_since: "Hors ligne depuis : ", day: "j", hour: "h", min: "min", lbl_vod_history: "VODs récemment regardées :", lbl_channel_history: "Streamers récents :", btn_clear: "Effacer", not_found: "❌ Streamer introuvable.", offline_msg: "Pas de stream en cours.",
+            fr: { title: "Regarder Twitch sans Sub", tab_discovery: "🌟 Découverte", tab_id: "Lien / ID", tab_streamer: "Streamer", mobile_title: "📱 Mode Mobile", mobile_desc: "Astuce : utilisez Outplayer, VLC ou Infuse.", ph_id: "ID ou Lien de la VOD", btn_unlock: "Déverrouiller", ph_streamer: "Streamer + Mot (Ex: squeezie horreur)", btn_search: "🔍 Chercher", status_ready: "Prêt.", lbl_quality: "Qualité :", btn_pip: "📺 Activer PiP", btn_dl: "📥 Fichier M3U8", lbl_link: "Lien externe :", btn_copy: "Copier", err_missing: "Nom manquant.", loading: "Chargement...", live_on: "EN DIRECT", btn_watch_live: "▶️ Regarder le Live", no_vod: "Aucune VOD trouvée.", vods_found: "VODs trouvées.", err_network: "Erreur réseau.", err_live: "Erreur Live.", loading_vod: "Lancement VOD...", vod_ready: "VOD en lecture !", err_conn: "Erreur connexion.", copied: "Lien copié !", offline: "HORS LIGNE", offline_since: "Hors ligne depuis : ", day: "j", hour: "h", min: "min", lbl_vod_history: "VODs récemment regardées :", lbl_channel_history: "Streamers récents :", btn_clear: "Effacer", not_found: "❌ Streamer introuvable.", offline_msg: "Pas de stream en cours.",
             followed_channels: "💜 Vos Chaînes Suivies", top_streams: "🔥 Top Streams", btn_refresh: "🔄 Actualiser", btn_logout: "Déconnexion", login_prompt: "Connectez-vous pour retrouver facilement vos chaînes préférées et synchroniser votre historique.", btn_login_twitch: "🟣 Se connecter avec Twitch", login_required: "Veuillez vous connecter pour afficher les streams en cours.", loading_channels: "Chargement de vos chaînes...", loading_top: "Chargement du Top...", err_loading: "Erreur lors du chargement.", no_live: "Aucune chaîne en live pour le moment.", session_expired: "Session expirée. Veuillez vous reconnecter.", top_fr: "🇫🇷 FR", top_world: "🌍 Monde" },
             
-            en: { title: "Watch Twitch No Sub", tab_discovery: "🌟 Discovery", tab_id: "Link / ID", tab_streamer: "Streamer", mobile_title: "📱 Mobile Mode", mobile_desc: "Tip: use Outplayer, VLC or Infuse.", ph_id: "VOD ID or Link", btn_unlock: "Unlock", ph_streamer: "Streamer Name", btn_search: "🔍 Search", status_ready: "Ready.", lbl_quality: "Quality:", btn_pip: "📺 Toggle PiP", btn_dl: "📥 Download (File)", lbl_link: "External Link:", btn_copy: "Copy", err_missing: "Name missing.", loading: "Loading...", live_on: "LIVE NOW", btn_watch_live: "▶️ Watch Live", no_vod: "No VODs found.", vods_found: "VODs found.", err_network: "Network error.", err_live: "Live error.", loading_vod: "Loading VOD...", vod_ready: "VOD Playing!", err_conn: "Connection error.", copied: "Link copied!", offline: "OFFLINE", offline_since: "Offline since: ", day: "d", hour: "h", min: "min", lbl_vod_history: "Recently watched VODs:", lbl_channel_history: "Recent Streamers:", btn_clear: "Clear", not_found: "❌ Streamer not found.", offline_msg: "Stream is offline.",
+            en: { title: "Watch Twitch No Sub", tab_discovery: "🌟 Discovery", tab_id: "Link / ID", tab_streamer: "Streamer", mobile_title: "📱 Mobile Mode", mobile_desc: "Tip: use Outplayer, VLC or Infuse.", ph_id: "VOD ID or Link", btn_unlock: "Unlock", ph_streamer: "Streamer + Word (Ex: shroud horror)", btn_search: "🔍 Search", status_ready: "Ready.", lbl_quality: "Quality:", btn_pip: "📺 Toggle PiP", btn_dl: "📥 Download (File)", lbl_link: "External Link:", btn_copy: "Copy", err_missing: "Name missing.", loading: "Loading...", live_on: "LIVE NOW", btn_watch_live: "▶️ Watch Live", no_vod: "No VODs found.", vods_found: "VODs found.", err_network: "Network error.", err_live: "Live error.", loading_vod: "Loading VOD...", vod_ready: "VOD Playing!", err_conn: "Connection error.", copied: "Link copied!", offline: "OFFLINE", offline_since: "Offline since: ", day: "d", hour: "h", min: "min", lbl_vod_history: "Recently watched VODs:", lbl_channel_history: "Recent Streamers:", btn_clear: "Clear", not_found: "❌ Streamer not found.", offline_msg: "Stream is offline.",
             followed_channels: "💜 Followed Channels", top_streams: "🔥 Top Streams", btn_refresh: "🔄 Refresh", btn_logout: "Logout", login_prompt: "Log in to easily find your favorite channels and sync your history.", btn_login_twitch: "🟣 Log in with Twitch", login_required: "Please log in to view live streams.", loading_channels: "Loading your channels...", loading_top: "Loading Top...", err_loading: "Error loading data.", no_live: "No live channels at the moment.", session_expired: "Session expired. Please log in again.", top_fr: "🇫🇷 FR", top_world: "🌍 World" },
             
-            es: { title: "Ver Twitch sin Sub", tab_discovery: "🌟 Descubrir", tab_id: "Enlace / ID", tab_streamer: "Streamer", mobile_title: "📱 Modo Móvil", mobile_desc: "Consejo: usa Outplayer, VLC o Infuse.", ph_id: "ID o Enlace VOD", btn_unlock: "Desbloquear", ph_streamer: "Nombre del Streamer", btn_search: "🔍 Buscar", status_ready: "Listo.", lbl_quality: "Calidad:", btn_pip: "📺 Modo PiP", btn_dl: "📥 Descargar", lbl_link: "Enlace externo:", btn_copy: "Copiar", err_missing: "Falta el nombre.", loading: "Cargando...", live_on: "EN VIVO", btn_watch_live: "▶️ Ver Directo", no_vod: "No se encontraron VODs.", vods_found: "VODs encontrados.", err_network: "Error de red.", err_live: "Error de directo.", loading_vod: "Cargando VOD...", vod_ready: "VOD Reproduciendo!", err_conn: "Error de conexión.", copied: "Enlace copiado!", offline: "DESCONECTADO", offline_since: "Desconectado desde: ", day: "d", hour: "h", min: "min", lbl_vod_history: "VODs recientes:", lbl_channel_history: "Streamers recientes:", btn_clear: "Borrar", not_found: "❌ Streamer no encontrado.", offline_msg: "No hay directo en curso.",
+            es: { title: "Ver Twitch sin Sub", tab_discovery: "🌟 Descubrir", tab_id: "Enlace / ID", tab_streamer: "Streamer", mobile_title: "📱 Modo Móvil", mobile_desc: "Consejo: usa Outplayer, VLC o Infuse.", ph_id: "ID o Enlace VOD", btn_unlock: "Desbloquear", ph_streamer: "Streamer + Palabra (Ej: ibai horror)", btn_search: "🔍 Buscar", status_ready: "Listo.", lbl_quality: "Calidad:", btn_pip: "📺 Modo PiP", btn_dl: "📥 Descargar", lbl_link: "Enlace externo:", btn_copy: "Copiar", err_missing: "Falta el nombre.", loading: "Cargando...", live_on: "EN VIVO", btn_watch_live: "▶️ Ver Directo", no_vod: "No se encontraron VODs.", vods_found: "VODs encontrados.", err_network: "Error de red.", err_live: "Error de directo.", loading_vod: "Cargando VOD...", vod_ready: "VOD Reproduciendo!", err_conn: "Error de conexión.", copied: "Enlace copiado!", offline: "DESCONECTADO", offline_since: "Desconectado desde: ", day: "d", hour: "h", min: "min", lbl_vod_history: "VODs recientes:", lbl_channel_history: "Streamers recientes:", btn_clear: "Borrar", not_found: "❌ Streamer no encontrado.", offline_msg: "No hay directo en curso.",
             followed_channels: "💜 Canales Seguidos", top_streams: "🔥 Top Streams", btn_refresh: "🔄 Actualizar", btn_logout: "Cerrar sesión", login_prompt: "Inicia sesión para encontrar tus canales favoritos y sincronizar tu historial.", btn_login_twitch: "🟣 Iniciar sesión con Twitch", login_required: "Inicia sesión para ver los streams.", loading_channels: "Cargando tus canales...", loading_top: "Cargando Top...", err_loading: "Error al cargar.", no_live: "No hay canales en vivo ahora.", session_expired: "Sesión expirada. Inicia sesión de nuevo.", top_fr: "🇫🇷 FR", top_world: "🌍 Mundo" }
         };
 
@@ -240,7 +264,7 @@
         let hls = null;
         let player = null;
         
-        let useProxy = localStorage.getItem('twitch_use_proxy') !== 'false'; // <-- GESTION DU PROXY
+        let useProxy = localStorage.getItem('twitch_use_proxy') !== 'false'; 
         let searchHistory = JSON.parse(localStorage.getItem('twitch_vod_history')) || [];
         let globalTwitchUserId = null; 
         
@@ -252,10 +276,27 @@
             const userLang = navigator.language.slice(0, 2);
             if (translations[userLang]) setLanguage(userLang); else setLanguage('fr');
             
-            document.getElementById('proxyToggle').checked = useProxy; // <-- COCHE LA CASE AU DÉMARRAGE
+            document.getElementById('proxyToggle').checked = useProxy;
             
             player = new Plyr('#player', { controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'airplay', 'fullscreen'], settings: ['speed'], fullscreen: { enabled: true, fallback: true, iosNative: true } });
             
+            // --- INJECTION DU CHAT OVERLAY DANS PLYR ---
+            player.on('ready', () => {
+                if(!document.getElementById('chat-overlay')) {
+                    const plyrContainer = document.querySelector('.plyr');
+                    
+                    const chatOverlay = document.createElement('div');
+                    chatOverlay.id = 'chat-overlay';
+                    plyrContainer.appendChild(chatOverlay);
+
+                    const chatToggleBtn = document.createElement('button');
+                    chatToggleBtn.id = 'chat-toggle-btn';
+                    chatToggleBtn.innerHTML = '💬 Chat';
+                    chatToggleBtn.onclick = () => { chatOverlay.classList.toggle('active'); };
+                    plyrContainer.appendChild(chatToggleBtn);
+                }
+            });
+
             player.on('timeupdate', () => {
                 const video = document.getElementById('player');
                 if (currentVodId && video.currentTime > 0) {
@@ -278,7 +319,6 @@
             if (/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)) document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
         });
 
-        // <-- NOUVELLE FONCTION PROXY -->
         function toggleProxyPref() {
             useProxy = document.getElementById('proxyToggle').checked;
             localStorage.setItem('twitch_use_proxy', useProxy);
@@ -503,9 +543,15 @@
             if (days > 0) return `${days} ${txt('day')}`; if (hours > 0) return `${hours} ${txt('hour')}`; return `${minutes} ${txt('min')}`;
         }
 
+        // --- NOUVELLE RECHERCHE AVEC FILTRE PAR MOT-CLÉ ---
         async function searchStreamer(autoPlay = false) {
-            const channelName = document.getElementById('channelInput').value.trim();
-            if (!channelName) return setStatus("err_missing", 'error');
+            const rawInput = document.getElementById('channelInput').value.trim();
+            if (!rawInput) return setStatus("err_missing", 'error');
+            
+            const parts = rawInput.split(' ');
+            const channelName = parts[0]; // Pseudo
+            const searchKeyword = parts.slice(1).join(' ').toLowerCase(); // Le reste
+            
             setStatus("loading", 'loading'); elementsCache.vodList.style.display = 'none'; elementsCache.liveArea.innerHTML = ''; hidePlayer();
             try {
                 const [resVods, resLive] = await Promise.all([fetch(`${API_URL}/api/get-channel-videos?name=${channelName}`), fetch(`${API_URL}/api/get-live?name=${channelName}&proxy=${useProxy}`)]);
@@ -514,6 +560,7 @@
                 if (dataLive.error && dataVods.error && !hasAvatar) { setStatus("not_found", 'error'); return; }
                 saveToHistory(channelName, 'channel', channelName);
                 const avatarUrl = hasAvatar || "https://static-cdn.jtvnw.net/user-default-pictures-uv/cdd517fe-def4-11e9-948e-784f43822e80-profile_image-70x70.png";
+                
                 if (!dataLive.error) {
                     const thumbUrl = dataLive.thumbnail ? dataLive.thumbnail.replace('{width}', '320').replace('{height}', '180') : "";
                     elementsCache.liveArea.innerHTML = `<div class="live-card online"><img src="${avatarUrl}" class="live-avatar"><div class="live-info"><span class="live-badge">${txt('live_on')}</span><div class="live-title">${dataLive.title}</div><div class="live-game">${dataLive.game}</div><button class="btn-primary" style="margin-top:10px; width:100%" onclick="watchLive()">${txt('btn_watch_live')}</button></div>${thumbUrl ? `<div class="live-thumb-container"><img src="${thumbUrl}" class="live-thumb"></div>` : ''}</div>`;
@@ -526,26 +573,56 @@
                     }
                     elementsCache.liveArea.innerHTML = `<div class="live-card"><img src="${avatarUrl}" class="live-avatar" style="border-color:#555"><div class="live-info"><span class="live-badge" style="background:#555">${txt('offline')}</span><div class="live-title" style="color:#aaa; margin-top:5px;">${offlineText}</div></div></div>`;
                 }
+                
                 if (dataVods.error) { setStatus("no_vod", 'error'); } else {
-                    setStatus("vods_found", 'success'); elementsCache.vodList.innerHTML = ''; elementsCache.vodList.style.display = 'grid';
+                    elementsCache.vodList.innerHTML = ''; elementsCache.vodList.style.display = 'grid';
+                    let displayedCount = 0;
+                    
                     dataVods.videos.forEach(vod => {
+                        const titleLower = vod.title.toLowerCase();
+                        const date = new Date(vod.publishedAt).toLocaleDateString(currentLang === 'fr' ? 'fr-FR' : 'en-US');
+                        
+                        if (searchKeyword && !titleLower.includes(searchKeyword) && !date.includes(searchKeyword)) {
+                            return; 
+                        }
+                        
+                        displayedCount++;
                         const card = document.createElement('div'); card.className = 'vod-card';
                         card.onclick = () => fetchAndPlayVod(vod.id, vod.title, vod.previewThumbnailURL, channelName);
-                        const duration = Math.floor(vod.lengthSeconds / 60) + ' min', date = new Date(vod.publishedAt).toLocaleDateString(currentLang === 'fr' ? 'fr-FR' : 'en-US');
+                        const duration = Math.floor(vod.lengthSeconds / 60) + ' min';
                         card.innerHTML = `<div class="stream-thumb-wrapper"><img src="${vod.previewThumbnailURL}" class="vod-thumb"></div><div class="vod-info"><div class="vod-title">${vod.title}</div><div class="vod-meta">${date} • ${duration}</div></div>`;
                         elementsCache.vodList.appendChild(card);
                     });
+                    
+                    if (displayedCount === 0 && searchKeyword) {
+                        setStatus(`Aucun résultat pour "${searchKeyword}"`, 'error');
+                        elementsCache.vodList.innerHTML = `<span style='color:#aaa; grid-column: 1 / -1; text-align: center; padding: 20px;'>Aucune VOD trouvée avec le terme <b>"${searchKeyword}"</b> dans les 100 dernières vidéos.</span>`;
+                    } else {
+                        setStatus(searchKeyword ? `${displayedCount} résultat(s) pour "${searchKeyword}"` : "vods_found", 'success');
+                    }
                 }
             } catch (e) { setStatus("err_network", 'error'); }
         }
 
         async function watchLive() {
-            const channelName = document.getElementById('channelInput').value.trim();
+            const rawInput = document.getElementById('channelInput').value.trim();
+            const channelName = rawInput.split(' ')[0]; // Prendre uniquement le pseudo
+            
             try {
-                // <-- AJOUT DE proxy=useProxy
                 const response = await fetch(`${API_URL}/api/get-live?name=${channelName}&proxy=${useProxy}`);
                 const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
+                
+                // --- ACTIVATION DE L'OVERLAY CHAT ---
+                const domain = window.location.hostname || 'localhost';
+                const chatDiv = document.getElementById('chat-overlay');
+                if(chatDiv) {
+                    chatDiv.innerHTML = `<iframe src="https://www.twitch.tv/embed/${channelName}/chat?parent=${domain}&darkpopout" height="100%" width="100%" border="0" scrolling="no"></iframe>`;
+                    chatDiv.style.display = 'block';
+                    chatDiv.classList.add('active'); // Ouvert par défaut
+                    document.getElementById('chat-toggle-btn').style.display = 'block';
+                }
+
                 currentVodId = null; setupPlayer(data.links); setStatus("Live: " + data.title, 'success'); scrollToPlayer();
             } catch (e) { setStatus("err_live", 'error'); }
         }
@@ -553,10 +630,19 @@
         async function fetchAndPlayVod(id, title, thumb = null, streamer = null) {
             setStatus("loading_vod", 'loading');
             try {
-                // <-- AJOUT DE proxy=useProxy
                 const response = await fetch(`${API_URL}/api/get-m3u8?id=${id}&proxy=${useProxy}`);
                 const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
+                
+                // --- DESACTIVATION DU CHAT POUR VOD ---
+                const chatDiv = document.getElementById('chat-overlay');
+                if(chatDiv) {
+                    chatDiv.innerHTML = '';
+                    chatDiv.style.display = 'none';
+                    chatDiv.classList.remove('active');
+                    document.getElementById('chat-toggle-btn').style.display = 'none';
+                }
+
                 saveToHistory(id, 'vod', title || `VOD ${id}`, { thumb: thumb, streamer: streamer });
                 currentVodId = id; isNewVodLoad = true; setupPlayer(data.links); setStatus(title ? title : "vod_ready", 'success'); scrollToPlayer();
             } catch (e) { setStatus("err_conn", 'error'); }
@@ -577,11 +663,13 @@
         }
 
         function scrollToPlayer() { document.getElementById('video-container').scrollIntoView({ behavior: "smooth", block: "start" }); }
+        
         function setupPlayer(links) {
             currentLinks = links; elementsCache.qualitySelect.innerHTML = '';
             for (const [q, url] of Object.entries(links)) { const opt = document.createElement('option'); opt.value = q; opt.textContent = q.toUpperCase().replace('CHUNKED', 'SOURCE'); elementsCache.qualitySelect.appendChild(opt); }
             elementsCache.optionsBar.style.display = 'flex'; elementsCache.videoContainer.style.display = 'block'; elementsCache.vlcSection.style.display = 'flex'; changeQuality();
         }
+        
         function changeQuality() {
             const rawUrl = currentLinks[elementsCache.qualitySelect.value]; if (!rawUrl) return;
             elementsCache.vlcInput.value = rawUrl; const video = document.getElementById('player');
@@ -592,29 +680,40 @@
             if (Hls.isSupported()) { if (hls) hls.destroy(); hls = new Hls(); hls.loadSource(rawUrl); hls.attachMedia(video); hls.on(Hls.Events.MANIFEST_PARSED, restoreAndPlay); 
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) { video.src = rawUrl; video.addEventListener('loadedmetadata', restoreAndPlay, { once: true }); }
         }
-        function hidePlayer() { elementsCache.optionsBar.style.display = 'none'; elementsCache.videoContainer.style.display = 'none'; elementsCache.vlcSection.style.display = 'none'; if (hls) hls.destroy(); player.stop(); }
+        
+        function hidePlayer() { 
+            elementsCache.optionsBar.style.display = 'none'; 
+            elementsCache.videoContainer.style.display = 'none'; 
+            elementsCache.vlcSection.style.display = 'none'; 
+            if (hls) hls.destroy(); 
+            player.stop(); 
+            
+            const chatDiv = document.getElementById('chat-overlay');
+            if(chatDiv) {
+                chatDiv.innerHTML = '';
+                document.getElementById('chat-toggle-btn').style.display = 'none';
+            }
+        }
+        
         function togglePiP() { 
             const v = document.getElementById('player'); 
-            
-            // 1. Essayer la méthode spécifique à Apple (iOS / Safari)
             if (v.webkitSupportsPresentationMode && typeof v.webkitSetPresentationMode === "function") {
                 v.webkitSetPresentationMode(v.webkitPresentationMode === "picture-in-picture" ? "inline" : "picture-in-picture");
             } 
-            // 2. Essayer la méthode standard (PC / Android / Autres navigateurs)
             else if (document.pictureInPictureEnabled) {
                 document.pictureInPictureElement ? document.exitPictureInPicture() : v.requestPictureInPicture();
             } 
-            // 3. Fallback
             else {
                 alert("Le mode PiP est bloqué par iOS dans ce mode. Mettez la vidéo en plein écran et utilisez l'icône PiP native d'Apple en haut à gauche !");
             }
         }
+        
         function downloadM3U8() { const l = document.createElement('a'); l.href = URL.createObjectURL(new Blob([`#EXTM3U\n#EXTINF:-1,Twitch\n${elementsCache.vlcInput.value}`],{type:'audio/x-mpegurl'})); l.download='video.m3u'; l.click(); }
         function copyLink() { elementsCache.vlcInput.select(); navigator.clipboard.writeText(elementsCache.vlcInput.value); alert(txt('copied')); }
         function openInVLC_Mobile() { window.location.href = 'vlc://' + elementsCache.vlcInput.value; }
         function openInOutplayer() { window.location.href = 'outplayer://' + elementsCache.vlcInput.value; }
         function openInInfuse() { 
-            let targetName = document.getElementById('channelInput').value.trim() || document.getElementById('vodInput').value.trim() || "Twitch_Live";
+            let targetName = document.getElementById('channelInput').value.trim().split(' ')[0] || document.getElementById('vodInput').value.trim() || "Twitch_Live";
             targetName = targetName.replace(/[^a-zA-Z0-9]/g, "_");
             const cleanUrl = elementsCache.vlcInput.value.replace('/api/proxy', `/api/proxy/${targetName}.m3u8`);
             window.location.href = 'infuse://x-callback-url/play?url=' + encodeURIComponent(cleanUrl); 
