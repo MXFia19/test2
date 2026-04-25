@@ -100,7 +100,7 @@ async function handleGetLive(url, workerOrigin) {
 
     try {
         // --- TENTATIVE 1 : Luminous API (Filtre Anti-Pub) ---
-        const resLuminous = await fetch(`https://as.luminous.dev/live/${login}?allow_source=true`, { headers: REQUEST_HEADERS });
+        const resLuminous = await fetch(`https://as.luminous.dev/live/${login}?allow_source=true`, { headers: getRequestHeaders(login) });
         if (resLuminous.ok) {
             m3u8Content = await resLuminous.text();
             masterUrl = resLuminous.url;
