@@ -89,24 +89,46 @@ async function handleGetVideos(url) {
 
 async function handleGetLive(url, workerOrigin) {
     const name = url.searchParams.get('name'); if (!name) return jsonError("Nom manquant"); const login = name.trim().toLowerCase();
+    const useProxy = true; // On force toujours le proxy pour les Lives (CORS)
     
-    // CORRECTION : On force TOUJOURS le proxy pour les Lives à cause des sécurités CORS de Twitch !
-    const useProxy = true; 
-    
+    let m3u8Content = "";
+    let masterUrl = "";
+
     try {
-        const token = await getAccessToken(login, true); if (!token) return jsonError("Offline", 404);
-        const res = await fetch(`https://usher.ttvnw.net/api/channel/hls/${login}.m3u8?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&playlist_include_framerate=true&segment_preference=4&sig=${token.signature}&token=${encodeURIComponent(token.value)}`, { headers: COMMON_HEADERS });
-        if (!res.ok) throw new Error("Stream introuvable");
-        
-        // On passe 'false' pour isVod (pour ne pas proxifier les .ts) et 'true' pour useProxy
-        const links = parseAndProxyM3U8(await res.text(), res.url, workerOrigin, false, useProxy);
-        
+        // --- TENTATIVE 1 : Luminous API (Filtre Anti-Pub) ---
+        const resLuminous = await fetch(`https://as.luminous.dev/live/${login}?allow_source=true`);
+        if (resLuminous.ok) {
+            m3u8Content = await resLuminous.text();
+            masterUrl = resLuminous.url;
+        } else {
+            throw new Error("Luminous down");
+        }
+    } catch(e) {
+        // --- TENTATIVE 2 : Plan de Secours Officiel Twitch ---
+        try {
+            const token = await getAccessToken(login, true); if (!token) return jsonError("Offline", 404);
+            const resUsher = await fetch(`https://usher.ttvnw.net/api/channel/hls/${login}.m3u8?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&playlist_include_framerate=true&segment_preference=4&sig=${token.signature}&token=${encodeURIComponent(token.value)}`, { headers: COMMON_HEADERS });
+            if (!resUsher.ok) throw new Error("Stream introuvable");
+            m3u8Content = await resUsher.text();
+            masterUrl = resUsher.url;
+        } catch(err) {
+            return jsonError("Offline ou introuvable", 404);
+        }
+    }
+
+    // Découpage du fichier M3U8 avec notre Proxy
+    const links = parseAndProxyM3U8(m3u8Content, masterUrl, workerOrigin, false, useProxy);
+    
+    // Récupération des infos du stream (Titre, Jeu, Avatar) pour un bel affichage
+    try {
         const meta = await twitchGQL(`query { user(login: "${login}") { profileImageURL(width: 70) broadcastSettings { title game { displayName } } } }`);
         const info = meta.data?.user?.broadcastSettings, avatar = meta.data?.user?.profileImageURL;
         return jsonResponse({ links, best: links["Source"] || links["Auto"], title: info?.title || "Live", game: info?.game?.displayName || "", thumbnail: `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-640x360.jpg`, avatar: avatar || "" });
-    } catch (e) { return jsonError(e.message, 404); }
+    } catch(e) {
+        // Si l'API GQL bug, on renvoie la vidéo quand même
+        return jsonResponse({ links, best: links["Source"] || links["Auto"], title: "Live", game: "", thumbnail: `https://static-cdn.jtvnw.net/previews-ttv/live_user_${login}-640x360.jpg`, avatar: "" });
+    }
 }
-
 async function handleGetM3U8(url, workerOrigin) {
     const vodId = url.searchParams.get('id'); if (!vodId) return jsonError("ID manquant");
     const useProxy = url.searchParams.get('proxy') !== 'false';
