@@ -365,15 +365,15 @@
                             method: 'POST',
                             headers: { 'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko' }, // Clé publique Twitch
                             body: JSON.stringify({
-                                query: `query { searchFor(query: "${val}", type: CHANNEL, first: 5) { channels { edges { item { login, displayName, profileImageURL(width: 70) } node { login, displayName, profileImageURL(width: 70) } } } } }`
+                                query: `query { searchUsers(userQuery: "${val}", first: 5) { edges { node { login, displayName, profileImageURL(width: 70) } } } }`
                             })
                         });
                         const json = await res.json();
                         
                         // Extraction des résultats
-                        const edges = json.data?.searchFor?.channels?.edges || [];
+                        const edges = json.data?.searchUsers?.edges || [];
                         edges.forEach(edge => {
-                            const channel = edge.item || edge.node;
+                            const channel = edge.node;
                             if (channel && channel.login) {
                                 suggestions.push({ login: channel.login, name: channel.displayName, avatar: channel.profileImageURL });
                             }
