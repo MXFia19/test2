@@ -1,12 +1,16 @@
-// worker.js - VERSION V15 (Cloudflare KV Sync + Option Proxy)
 const CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 
-const COMMON_HEADERS = {
+// Headers pour RÉPONDRE à votre site web
+const RESPONSE_HEADERS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Cache-Control, Range',
-    'Access-Control-Expose-Headers': 'Content-Length, Content-Range',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'Access-Control-Expose-Headers': 'Content-Length, Content-Range'
+};
+
+// Headers pour ATTAQUER Twitch et Luminous incognito
+const REQUEST_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Safari/537.36',
     'Referer': 'https://www.twitch.tv/',
     'Origin': 'https://www.twitch.tv'
 };
@@ -15,14 +19,14 @@ const QUALITY_ORDER = ['chunked', 'source', '1080p60', '1080p30', '720p60', '720
 
 export default {
     async fetch(request, env, ctx) {
-        if (request.method === "OPTIONS") return new Response(null, { headers: COMMON_HEADERS });
+        if (request.method === "OPTIONS") return new Response(null, { headers: RESPONSE_HEADERS });
 
         const url = new URL(request.url);
         const workerOrigin = url.origin; 
         
         try {
             switch (url.pathname) {
-                case '/': return new Response("Twitch Proxy V15 - Sync & Proxy Toggle Ready", { headers: COMMON_HEADERS });
+                case '/': return new Response("Twitch Proxy - Anti 403 Ready", { headers: RESPONSE_HEADERS });
                 case '/api/get-live': return await handleGetLive(url, workerOrigin);
                 case '/api/get-channel-videos': return await handleGetVideos(url);
                 case '/api/get-m3u8': return await handleGetM3U8(url, workerOrigin);
@@ -32,10 +36,10 @@ export default {
                 case '/api/sync/get': return await handleSyncGet(url, env);
                 case '/api/sync/post': return await handleSyncPost(request, env);
                 
-                default: return new Response("Not Found", { status: 404, headers: COMMON_HEADERS });
+                default: return new Response("Not Found", { status: 404, headers: RESPONSE_HEADERS });
             }
         } catch (e) {
-            return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...COMMON_HEADERS, 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...RESPONSE_HEADERS, 'Content-Type': 'application/json' } });
         }
     }
 };
@@ -169,12 +173,12 @@ async function handleGetM3U8(url, workerOrigin) {
     return jsonError("VOD introuvable", 404);
 }
 
-// --- LE PROXY POUR CONTOURNER CORS ET LES BLOCAGES ---
 async function handleProxy(url, request) {
     const target = url.searchParams.get('url'); if (!target) return new Response("URL manquante", { status: 400 });
     const isVod = url.searchParams.get('isVod') === 'true', workerOrigin = url.origin;
     
-    let fetchHeaders = { ...COMMON_HEADERS }; 
+    // On utilise les headers d'attaque !
+    let fetchHeaders = { ...REQUEST_HEADERS }; 
     if (request.headers.get("Range")) fetchHeaders["Range"] = request.headers.get("Range");
     
     const res = await fetch(target, { headers: fetchHeaders }); 
@@ -194,7 +198,6 @@ async function handleProxy(url, request) {
     }
     return new Response(res.body, { status: res.status, headers: newHeaders });
 }
-
 // --- FONCTIONS UTILITAIRES ---
 function parseAndProxyM3U8(content, master, workerOrigin, isVod, useProxy = true) { 
     const lines = content.split('\n'); const proxyBase = `${workerOrigin}/api/proxy?url=`; let unsorted = {}, last = ""; 
