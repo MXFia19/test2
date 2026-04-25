@@ -31,18 +31,18 @@
         /* --- CHAT OVERLAY INTÉGRÉ AU LECTEUR --- */
         #chat-overlay {
             position: absolute; top: 0; right: 0; width: 320px;
-            height: calc(100% - 48px); /* Laisse la place aux contrôles Plyr en bas */
+            height: calc(100% - 48px);
             background: rgba(14, 14, 16, 0.9); z-index: 40; display: none; 
             transition: transform 0.3s ease-in-out; transform: translateX(100%);
             border-left: 1px solid rgba(255,255,255,0.1);
         }
-        #chat-overlay.active { transform: translateX(0); } /* Glisse dans l'écran */
+        #chat-overlay.active { transform: translateX(0); }
 
         #chat-toggle-btn {
             position: absolute; top: 15px; right: 15px; z-index: 45;
             background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.2);
             color: white; padding: 6px 12px; border-radius: 8px; cursor: pointer;
-            font-size: 0.85rem; font-weight: bold; display: none; /* Uniquement visible en Live */
+            font-size: 0.85rem; font-weight: bold; display: none; 
             backdrop-filter: blur(4px); transition: 0.2s;
         }
         #chat-toggle-btn:hover { background: var(--primary); border-color: var(--primary); }
@@ -123,6 +123,13 @@
         input.vlc-link { width: 100%; font-family: monospace; color: #bf94ff; text-align: center; font-size: 0.8rem; }
         #status-msg { margin-bottom: 15px; font-weight: 600; min-height: 1.2em; font-size: 0.95rem; }
         .status-loading { color: #e6e619; } .status-success { color: #00ff88; } .status-error { color: #ff4f4d; }
+
+        /* --- AUTOCOMPLÉTION --- */
+        .autocomplete-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: #26262c; border: 1px solid var(--primary); border-radius: 8px; z-index: 100; max-height: 250px; overflow-y: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.5); text-align: left; margin-top: 5px; display: none; }
+        .suggestion-item { padding: 10px; cursor: pointer; color: white; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #3a3a40; transition: 0.2s; }
+        .suggestion-item:last-child { border-bottom: none; }
+        .suggestion-item:hover { background: #3a3a40; padding-left: 15px; border-left: 3px solid var(--primary); }
+        .suggestion-avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; background: #111; flex-shrink: 0; }
 
         @media (max-width: 600px) { 
             .container { padding: 15px; padding-top: 45px; width: 100%; } 
@@ -224,7 +231,10 @@
 
         <div id="tab-channel" class="tab-content">
             <div class="search-bar">
-                <input type="text" id="channelInput" placeholder="Streamer + Mot (Ex: squeezie horreur)" data-placeholder="ph_streamer" onkeydown="if(event.key==='Enter') searchStreamer()">
+                <div style="position: relative; flex: 1; min-width: 200px; display: flex; width: 100%;">
+                    <input type="text" id="channelInput" style="width: 100%;" placeholder="Streamer + Mot (Ex: squeezie horreur)" data-placeholder="ph_streamer" onkeydown="if(event.key==='Enter') { searchStreamer(); document.getElementById('autocomplete-box').style.display='none'; }" autocomplete="off">
+                    <div id="autocomplete-box" class="autocomplete-suggestions"></div>
+                </div>
                 <button class="btn-primary" onclick="searchStreamer()" data-lang="btn_search">🔍 Chercher</button>
             </div>
             <div id="channel-history-container">
@@ -278,9 +288,12 @@
             
             document.getElementById('proxyToggle').checked = useProxy;
             
+            // ICI : Lancement de l'autocomplétion !
+            setupAutocomplete();
+            
             player = new Plyr('#player', { controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'airplay', 'fullscreen'], settings: ['speed'], fullscreen: { enabled: true, fallback: true, iosNative: true } });
             
-            // --- INJECTION DU CHAT OVERLAY DANS PLYR ---
+            // Injection du Chat Overlay dans le lecteur
             player.on('ready', () => {
                 if(!document.getElementById('chat-overlay')) {
                     const plyrContainer = document.querySelector('.plyr');
@@ -318,6 +331,90 @@
             
             if (/Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent)) document.querySelectorAll('.mobile-only').forEach(el => el.style.display = 'block');
         });
+
+        // --- SYSTÈME D'AUTOCOMPLÉTION (SANS CONNEXION REQUISE) ---
+        let searchTimeout = null;
+
+        function setupAutocomplete() {
+            const input = document.getElementById('channelInput');
+            const box = document.getElementById('autocomplete-box');
+
+            input.addEventListener('input', (e) => {
+                const rawVal = e.target.value;
+                const val = rawVal.split(' ')[0].toLowerCase().trim(); // On cherche uniquement le pseudo
+                
+                clearTimeout(searchTimeout);
+                if (!val || rawVal.includes(' ')) { 
+                    box.style.display = 'none';
+                    return;
+                }
+
+                searchTimeout = setTimeout(async () => {
+                    let suggestions = [];
+                    
+                    // 1. Chercher dans l'historique local (Instantané)
+                    searchHistory.filter(h => h.type === 'channel').forEach(h => {
+                        if (h.term.toLowerCase().includes(val)) {
+                            suggestions.push({ login: h.term, name: h.display, avatar: null });
+                        }
+                    });
+
+                    // 2. Chercher via l'API Publique de Twitch (GQL) - SANS CONNEXION !
+                    try {
+                        const res = await fetch('https://gql.twitch.tv/gql', {
+                            method: 'POST',
+                            headers: { 'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko' }, // Clé publique Twitch
+                            body: JSON.stringify({
+                                query: `query { searchFor(query: "${val}", type: CHANNEL, first: 5) { channels { edges { item { login, displayName, profileImageURL(width: 70) } node { login, displayName, profileImageURL(width: 70) } } } } }`
+                            })
+                        });
+                        const json = await res.json();
+                        
+                        // Extraction des résultats
+                        const edges = json.data?.searchFor?.channels?.edges || [];
+                        edges.forEach(edge => {
+                            const channel = edge.item || edge.node;
+                            if (channel && channel.login) {
+                                suggestions.push({ login: channel.login, name: channel.displayName, avatar: channel.profileImageURL });
+                            }
+                        });
+                    } catch(err) { console.error("Erreur API Autocomplete:", err); }
+
+                    // 3. Déduplication
+                    const unique = []; const seen = new Set();
+                    suggestions.forEach(s => {
+                        if (!seen.has(s.login)) { seen.add(s.login); unique.push(s); }
+                    });
+
+                    // 4. Affichage
+                    if (unique.length > 0) {
+                        box.innerHTML = unique.slice(0, 6).map(s => `
+                            <div class="suggestion-item" onclick="selectSuggestion('${s.login}')">
+                                ${s.avatar ? `<img src="${s.avatar}" class="suggestion-avatar">` : `<div class="suggestion-avatar" style="display:flex;align-items:center;justify-content:center;font-size:12px;">👤</div>`}
+                                <div>
+                                    <div style="font-weight: 700; font-size: 0.9rem;">${s.name}</div>
+                                    ${s.login !== s.name.toLowerCase() ? `<div style="font-size: 0.7rem; color: #aaa;">${s.login}</div>` : ''}
+                                </div>
+                            </div>
+                        `).join('');
+                        box.style.display = 'block';
+                    } else {
+                        box.style.display = 'none';
+                    }
+                }, 300); // 300ms de délai pour ne pas spammer les serveurs
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!input.contains(e.target) && !box.contains(e.target)) box.style.display = 'none';
+            });
+        }
+
+        function selectSuggestion(login) {
+            const input = document.getElementById('channelInput');
+            input.value = login + " "; // Ajoute un espace pour inviter à taper un filtre
+            document.getElementById('autocomplete-box').style.display = 'none';
+            searchStreamer(); // Lance la recherche
+        }
 
         function toggleProxyPref() {
             useProxy = document.getElementById('proxyToggle').checked;
@@ -543,14 +640,13 @@
             if (days > 0) return `${days} ${txt('day')}`; if (hours > 0) return `${hours} ${txt('hour')}`; return `${minutes} ${txt('min')}`;
         }
 
-        // --- NOUVELLE RECHERCHE AVEC FILTRE PAR MOT-CLÉ ---
         async function searchStreamer(autoPlay = false) {
             const rawInput = document.getElementById('channelInput').value.trim();
             if (!rawInput) return setStatus("err_missing", 'error');
             
             const parts = rawInput.split(' ');
-            const channelName = parts[0]; // Pseudo
-            const searchKeyword = parts.slice(1).join(' ').toLowerCase(); // Le reste
+            const channelName = parts[0]; 
+            const searchKeyword = parts.slice(1).join(' ').toLowerCase(); 
             
             setStatus("loading", 'loading'); elementsCache.vodList.style.display = 'none'; elementsCache.liveArea.innerHTML = ''; hidePlayer();
             try {
@@ -606,20 +702,19 @@
 
         async function watchLive() {
             const rawInput = document.getElementById('channelInput').value.trim();
-            const channelName = rawInput.split(' ')[0]; // Prendre uniquement le pseudo
+            const channelName = rawInput.split(' ')[0]; 
             
             try {
                 const response = await fetch(`${API_URL}/api/get-live?name=${channelName}&proxy=${useProxy}`);
                 const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
                 
-                // --- ACTIVATION DE L'OVERLAY CHAT ---
                 const domain = window.location.hostname || 'localhost';
                 const chatDiv = document.getElementById('chat-overlay');
                 if(chatDiv) {
                     chatDiv.innerHTML = `<iframe src="https://www.twitch.tv/embed/${channelName}/chat?parent=${domain}&darkpopout" height="100%" width="100%" border="0" scrolling="no"></iframe>`;
                     chatDiv.style.display = 'block';
-                    chatDiv.classList.add('active'); // Ouvert par défaut
+                    chatDiv.classList.add('active'); 
                     document.getElementById('chat-toggle-btn').style.display = 'block';
                 }
 
@@ -634,7 +729,6 @@
                 const data = await response.json();
                 if (data.error) return setStatus(data.error, 'error');
                 
-                // --- DESACTIVATION DU CHAT POUR VOD ---
                 const chatDiv = document.getElementById('chat-overlay');
                 if(chatDiv) {
                     chatDiv.innerHTML = '';
